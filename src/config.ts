@@ -26,6 +26,14 @@ const EnvSchema = z
       .regex(/^[a-f0-9]{32}$/i, 'BUNGIE_API_KEY must be a 32 character hex string')
       .describe('Bungie API key from https://www.bungie.net/en/Application'),
 
+    // Destiny Zen: OAuth (optional; enables sign-in tools)
+    BUNGIE_CLIENT_ID: z.string().optional().describe('OAuth client_id from the Bungie app'),
+    BUNGIE_CLIENT_SECRET: z.string().optional().describe('OAuth client_secret from the Bungie app'),
+    DESTINY_ZEN_TOKEN_FILE: z
+      .string()
+      .optional()
+      .describe('Where sign-in tokens are stored (default ~/.destiny-zen/tokens.json)'),
+
     // Optional with defaults
     LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info').describe('Logging level'),
 

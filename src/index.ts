@@ -5,7 +5,13 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { BungieApiClient } from './api/index.js';
 import { ManifestCache } from './services/index.js';
-import { registerTools, registerLeaderboardTools, registerRaidHubTools } from './tools/index.js';
+import {
+  registerTools,
+  registerLeaderboardTools,
+  registerRaidHubTools,
+  registerAuthTools,
+} from './tools/index.js';
+import { BungieOAuth } from './auth/oauth.js';
 import { RaidHubClient } from './api/index.js';
 import { loadConfig, getConfigHelp, isValidApiKeyFormat, type Config } from './config.js';
 import dotenv from 'dotenv';
@@ -60,6 +66,19 @@ const manifestCache = new ManifestCache(config.BUNGIE_API_KEY, {
 
 // Register all Destiny 2 tools
 registerTools(server, bungieClient, manifestCache);
+
+// Destiny Zen: Bungie sign-in (OAuth) tools, enabled when client id/secret are configured
+if (config.BUNGIE_CLIENT_ID && config.BUNGIE_CLIENT_SECRET) {
+  const oauth = new BungieOAuth({
+    clientId: config.BUNGIE_CLIENT_ID,
+    clientSecret: config.BUNGIE_CLIENT_SECRET,
+    tokenFile: config.DESTINY_ZEN_TOKEN_FILE,
+  });
+  registerAuthTools(server, oauth, config.BUNGIE_API_KEY);
+  logger.info(`Bungie sign-in tools enabled (token file: ${oauth.tokenFile})`);
+} else {
+  logger.warn('BUNGIE_CLIENT_ID/BUNGIE_CLIENT_SECRET not set: sign-in tools disabled');
+}
 
 // Register leaderboard tools (World's First data)
 registerLeaderboardTools(server);
@@ -248,17 +267,13 @@ If you encounter a raw hash, use:
   })
 );
 
-server.prompt(
-  'pantheon_helper',
-  'Helper for Pantheon activity names and hashes',
-  {},
-  () => ({
-    messages: [
-      {
-        role: 'user',
-        content: {
-          type: 'text',
-          text: `# Pantheon Helper
+server.prompt('pantheon_helper', 'Helper for Pantheon activity names and hashes', {}, () => ({
+  messages: [
+    {
+      role: 'user',
+      content: {
+        type: 'text',
+        text: `# Pantheon Helper
 
 Use this helper when users ask about Pantheon activities.
 
@@ -279,11 +294,10 @@ Use this helper when users ask about Pantheon activities.
 
 - Pantheon has multiple legacy/reprise entries in DestinyActivityDefinition.
 - The three hashes above are the active set to prioritize in responses.`,
-        },
       },
-    ],
-  })
-);
+    },
+  ],
+}));
 
 // Start the server with stdio transport
 async function main() {
