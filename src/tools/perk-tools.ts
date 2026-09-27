@@ -138,6 +138,13 @@ export function registerPerkTools(
           return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
         }
 
+        const MAX_PER_CALL = 30;
+        const deferred = planned.splice(MAX_PER_CALL);
+        if (deferred.length) {
+          notes.push(
+            `${deferred.length} further change(s) not applied (limit ${MAX_PER_CALL} per call to stay within the 60 s bridge timeout); call set_perks again for: ${[...new Set(deferred.map((d) => `${d.weapon} (${d.itemId})`))].join(', ')}.`
+          );
+        }
         let ok = 0;
         const failures: string[] = [];
         for (let i = 0; i < planned.length; i++) {

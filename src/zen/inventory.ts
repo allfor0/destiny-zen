@@ -7,7 +7,7 @@ import type { BungieOAuth } from '../auth/oauth.js';
 import { authedGet } from '../tools/auth-tools.js';
 import type { ZenDefs, ZenDefsData } from './defs.js';
 
-const PROFILE_COMPONENTS = [102, 200, 201, 205, 300, 304, 305, 310].join(',');
+const PROFILE_COMPONENTS = [102, 200, 201, 205, 206, 300, 304, 305, 310].join(',');
 const CACHE_MS = 60_000;
 
 const ELEMENT: Record<number, string> = {
@@ -76,6 +76,19 @@ interface ProfileResponse {
   characters?: { data?: Record<string, { classType: number }> };
   characterInventories?: { data?: Record<string, { items: ProfileItem[] }> };
   characterEquipment?: { data?: Record<string, { items: ProfileItem[] }> };
+  characterLoadouts?: {
+    data?: Record<
+      string,
+      {
+        loadouts: Array<{
+          colorHash: number;
+          iconHash: number;
+          nameHash: number;
+          items: Array<{ itemInstanceId: string; plugItemHashes: number[] }>;
+        }>;
+      }
+    >;
+  };
   itemComponents?: {
     instances?: {
       data?: Record<
@@ -115,6 +128,8 @@ export class InventoryService {
   private membership: Membership | null = null;
   private cache: { at: number; rows: WeaponRow[] } | null = null;
   private characterIds: string[] = [];
+  private loadouts: LoadoutView[] = [];
+  private defsData: ZenDefsData | null = null;
 
   constructor(
     private readonly oauth: BungieOAuth,
@@ -147,8 +162,28 @@ export class InventoryService {
     );
     const rows = buildRows(profile, defs);
     this.characterIds = Object.keys(profile.characters?.data ?? {});
+    this.defsData = defs;
+    this.loadouts = buildLoadouts(profile, defs);
     this.cache = { at: Date.now(), rows };
     return rows;
+  }
+
+  /** In-game loadouts for every character (read with the same profile call). */
+  async getLoadouts(refresh = false): Promise<LoadoutView[]> {
+    await this.getWeapons(refresh);
+    return this.loadouts;
+  }
+
+  /** Loadout name/colour/icon definitions. */
+  async getLoadoutDefs(): Promise<
+    Pick<ZenDefsData, 'loadoutNames' | 'loadoutColors' | 'loadoutIcons'>
+  > {
+    const d = this.defsData ?? (await this.defs.get());
+    return {
+      loadoutNames: d.loadoutNames,
+      loadoutColors: d.loadoutColors,
+      loadoutIcons: d.loadoutIcons,
+    };
   }
 
   /** Character ids on the account (read after the first getWeapons call). */
@@ -385,4 +420,63 @@ export function toCsv(rows: WeaponRow[]): string {
     );
   }
   return lines.join('\n') + '\n';
+}
+
+export interface LoadoutView {
+  characterId: string;
+  className: string;
+  index: number;
+  empty: boolean;
+  name: string;
+  nameHash: number;
+  colorHash: number;
+  iconHash: number;
+  items: Array<{ itemId: string; name: string; type: string; plugs: string[] }>;
+}
+
+export function buildLoadouts(profile: ProfileResponse, defs: ZenDefsData): LoadoutView[] {
+  const chars = profile.characters?.data ?? {};
+  const hashById = new Map<string, number>();
+  const all = [
+    ...(profile.profileInventory?.data?.items ?? []),
+    ...Object.values(profile.characterInventories?.data ?? {}).flatMap((c) => c.items),
+    ...Object.values(profile.characterEquipment?.data ?? {}).flatMap((c) => c.items),
+  ];
+  for (const it of all) if (it.itemInstanceId) hashById.set(it.itemInstanceId, it.itemHash);
+
+  const out: LoadoutView[] = [];
+  for (const [charId, data] of Object.entries(profile.characterLoadouts?.data ?? {})) {
+    const cls = CLASS[chars[charId]?.classType ?? -1] ?? charId;
+    data.loadouts.forEach((lo, index) => {
+      const items = lo.items
+        .filter((i) => i.itemInstanceId && i.itemInstanceId !== '0')
+        .map((i) => {
+          const h = hashById.get(String(i.itemInstanceId));
+          const w = h ? defs.weapons[String(h)] : undefined;
+          const g = h ? defs.gear[String(h)] : undefined;
+          const plugs = (i.plugItemHashes ?? [])
+            .filter((p) => p && p !== 2166136261)
+            .map((p) => defs.plugs[String(p)]?.n ?? '')
+            .filter((n) => n && !/^(Empty|Default)/i.test(n));
+          return {
+            itemId: String(i.itemInstanceId),
+            name: w?.n ?? g?.[0] ?? (h ? `#${h}` : 'item no longer owned'),
+            type: w?.t ?? g?.[1] ?? '',
+            plugs,
+          };
+        });
+      out.push({
+        characterId: charId,
+        className: cls,
+        index,
+        empty: items.length === 0,
+        name: defs.loadoutNames[String(lo.nameHash)] ?? '',
+        nameHash: lo.nameHash,
+        colorHash: lo.colorHash,
+        iconHash: lo.iconHash,
+        items,
+      });
+    });
+  }
+  return out;
 }

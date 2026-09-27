@@ -12,6 +12,7 @@ import {
   registerAuthTools,
   registerInventoryTools,
   registerPerkTools,
+  registerLoadoutTools,
 } from './tools/index.js';
 import { ZenDefs } from './zen/defs.js';
 import { InventoryService } from './zen/inventory.js';
@@ -86,6 +87,7 @@ if (config.BUNGIE_CLIENT_ID && config.BUNGIE_CLIENT_SECRET) {
   );
   registerInventoryTools(server, inventory, config.DESTINY_ZEN_EXPORT_DIR);
   registerPerkTools(server, oauth, config.BUNGIE_API_KEY, inventory);
+  registerLoadoutTools(server, oauth, config.BUNGIE_API_KEY, inventory);
   logger.info(`Bungie sign-in tools enabled (token file: ${oauth.tokenFile})`);
 } else {
   logger.warn('BUNGIE_CLIENT_ID/BUNGIE_CLIENT_SECRET not set: sign-in tools disabled');

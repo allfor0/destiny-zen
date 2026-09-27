@@ -42,6 +42,12 @@ export interface ZenDefsData {
   plugs: Record<string, PlugDef>;
   stats: Record<string, string>;
   socketCategories: Record<string, string>;
+  /** Names of other equippable items (armour, subclasses, ghosts...): hash -> [name, type] */
+  gear: Record<string, [string, string]>;
+  /** In-game loadout names, colours and icons */
+  loadoutNames: Record<string, string>;
+  loadoutColors: number[];
+  loadoutIcons: number[];
 }
 
 interface RawItem {
@@ -91,7 +97,7 @@ export class ZenDefs {
       };
     }>(`${BASE}/Platform/Destiny2/Manifest/`, true);
     const version = manifest.Response.version;
-    const file = path.join(this.dir, `defs-${version.replace(/[^\w.-]/g, '_')}.json`);
+    const file = path.join(this.dir, `defs-v2-${version.replace(/[^\w.-]/g, '_')}.json`);
 
     try {
       this.data = JSON.parse(await fs.readFile(file, 'utf8')) as ZenDefsData;
@@ -102,7 +108,7 @@ export class ZenDefs {
 
     const paths = manifest.Response.jsonWorldComponentContentPaths.en;
     console.error('[ZenDefs] Downloading manifest definitions (first run, may take a minute)...');
-    const [items, stats, socketCats] = await Promise.all([
+    const [items, stats, socketCats, loNames, loColors, loIcons] = await Promise.all([
       this.getJson<Record<string, RawItem>>(`${BASE}${paths.DestinyInventoryItemDefinition}`),
       this.getJson<Record<string, { displayProperties?: { name?: string } }>>(
         `${BASE}${paths.DestinyStatDefinition}`
@@ -110,10 +116,20 @@ export class ZenDefs {
       this.getJson<Record<string, { displayProperties?: { name?: string } }>>(
         `${BASE}${paths.DestinySocketCategoryDefinition}`
       ),
+      this.getJson<Record<string, { name?: string }>>(
+        `${BASE}${paths.DestinyLoadoutNameDefinition}`
+      ),
+      this.getJson<Record<string, { index?: number }>>(
+        `${BASE}${paths.DestinyLoadoutColorDefinition}`
+      ),
+      this.getJson<Record<string, { index?: number }>>(
+        `${BASE}${paths.DestinyLoadoutIconDefinition}`
+      ),
     ]);
 
     const weapons: Record<string, WeaponDef> = {};
     const plugs: Record<string, PlugDef> = {};
+    const gear: Record<string, [string, string]> = {};
     for (const [hash, it] of Object.entries(items)) {
       const name = it.displayProperties?.name ?? '';
       if (it.itemType === 3 && name) {
@@ -128,6 +144,8 @@ export class ZenDefs {
             c.socketIndexes,
           ]),
         };
+      } else if (name && [2, 14, 16, 21, 22, 24].includes(it.itemType ?? -1) && !it.plug) {
+        gear[hash] = [name, it.itemTypeDisplayName ?? ''];
       } else if (it.plug && name) {
         plugs[hash] = {
           n: name,
@@ -145,7 +163,24 @@ export class ZenDefs {
       if (c.displayProperties?.name) catNames[hash] = c.displayProperties.name;
     }
 
-    this.data = { version, weapons, plugs, stats: statNames, socketCategories: catNames };
+    const loadoutNames: Record<string, string> = {};
+    for (const [hash, n] of Object.entries(loNames)) if (n.name) loadoutNames[hash] = n.name;
+    const byIndex = (o: Record<string, { index?: number }>) =>
+      Object.entries(o)
+        .sort((a, b) => (a[1].index ?? 0) - (b[1].index ?? 0))
+        .map(([h]) => Number(h));
+
+    this.data = {
+      version,
+      weapons,
+      plugs,
+      stats: statNames,
+      socketCategories: catNames,
+      gear,
+      loadoutNames,
+      loadoutColors: byIndex(loColors),
+      loadoutIcons: byIndex(loIcons),
+    };
     await fs.mkdir(this.dir, { recursive: true });
     await fs.writeFile(file, JSON.stringify(this.data));
     console.error(
