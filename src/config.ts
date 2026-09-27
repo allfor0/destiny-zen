@@ -33,6 +33,10 @@ const EnvSchema = z
       .string()
       .optional()
       .describe('Where sign-in tokens are stored (default ~/.destiny-zen/tokens.json)'),
+    DESTINY_ZEN_EXPORT_DIR: z
+      .string()
+      .optional()
+      .describe('Folder for export_weapons files (default ~/.destiny-zen/exports)'),
 
     // Optional with defaults
     LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info').describe('Logging level'),

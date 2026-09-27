@@ -79,6 +79,13 @@ export function registerAuthTools(server: McpServer, oauth: BungieOAuth, apiKey:
             `- Access token expires: ${s.accessExpiresAt} (refreshed automatically)`,
             `- Sign-in expires: ${s.refreshExpiresAt}`,
             `- Token file: ${s.tokenFile}`,
+            ...(s.refreshExpiresAt &&
+            new Date(s.refreshExpiresAt).getTime() - Date.now() < 14 * 24 * 3600 * 1000
+              ? [
+                  '',
+                  '⚠ Sign-in expires within 14 days. To renew: open PowerShell in the destiny-zen folder, run `npm run auth`, approve on Bungie, then restart the Claude desktop app.',
+                ]
+              : []),
           ]
         : [
             'Not signed in to Bungie (or the sign-in has expired).',

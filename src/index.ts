@@ -10,7 +10,10 @@ import {
   registerLeaderboardTools,
   registerRaidHubTools,
   registerAuthTools,
+  registerInventoryTools,
 } from './tools/index.js';
+import { ZenDefs } from './zen/defs.js';
+import { InventoryService } from './zen/inventory.js';
 import { BungieOAuth } from './auth/oauth.js';
 import { RaidHubClient } from './api/index.js';
 import { loadConfig, getConfigHelp, isValidApiKeyFormat, type Config } from './config.js';
@@ -75,6 +78,12 @@ if (config.BUNGIE_CLIENT_ID && config.BUNGIE_CLIENT_SECRET) {
     tokenFile: config.DESTINY_ZEN_TOKEN_FILE,
   });
   registerAuthTools(server, oauth, config.BUNGIE_API_KEY);
+  const inventory = new InventoryService(
+    oauth,
+    config.BUNGIE_API_KEY,
+    new ZenDefs(config.BUNGIE_API_KEY)
+  );
+  registerInventoryTools(server, inventory, config.DESTINY_ZEN_EXPORT_DIR);
   logger.info(`Bungie sign-in tools enabled (token file: ${oauth.tokenFile})`);
 } else {
   logger.warn('BUNGIE_CLIENT_ID/BUNGIE_CLIENT_SECRET not set: sign-in tools disabled');
