@@ -460,8 +460,11 @@ export function buildLoadouts(profile: ProfileResponse, defs: ZenDefsData): Load
             .filter((n) => n && !/^(Empty|Default)/i.test(n));
           return {
             itemId: String(i.itemInstanceId),
-            name: w?.n ?? g?.[0] ?? (h ? `#${h}` : 'item no longer owned'),
-            type: w?.t ?? g?.[1] ?? '',
+            name:
+              w?.n ??
+              g?.[0] ??
+              (h ? (defs.plugs[String(h)]?.n ?? `#${h}`) : 'item no longer owned'),
+            type: w?.t ?? g?.[1] ?? (h ? (defs.plugs[String(h)]?.t ?? '') : ''),
             plugs,
           };
         });

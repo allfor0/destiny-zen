@@ -114,7 +114,7 @@ export function registerLoadoutTools(
         .number()
         .int()
         .min(1)
-        .max(12)
+        .max(20)
         .describe('Loadout slot number as shown by get_loadouts (1-based)'),
     },
     async ({ character, slot }) => {
@@ -140,7 +140,7 @@ export function registerLoadoutTools(
     "Save the character's currently equipped gear (weapons, armour, subclass setup) into an in-game loadout slot, overwriting whatever the slot held. Optionally set the slot's name (one of Bungie's preset names), colour and icon (1-based index). Requires sign-in.",
     {
       character: CharacterEnum,
-      slot: z.number().int().min(1).max(12),
+      slot: z.number().int().min(1).max(20),
       name: z
         .string()
         .optional()
@@ -177,7 +177,7 @@ export function registerLoadoutTools(
     "Change an in-game loadout's name (one of Bungie's preset names), colour or icon without changing its items. Requires sign-in.",
     {
       character: CharacterEnum,
-      slot: z.number().int().min(1).max(12),
+      slot: z.number().int().min(1).max(20),
       name: z.string().optional(),
       color: z.number().int().optional(),
       icon: z.number().int().optional(),

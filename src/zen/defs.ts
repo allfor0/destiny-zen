@@ -97,7 +97,7 @@ export class ZenDefs {
       };
     }>(`${BASE}/Platform/Destiny2/Manifest/`, true);
     const version = manifest.Response.version;
-    const file = path.join(this.dir, `defs-v2-${version.replace(/[^\w.-]/g, '_')}.json`);
+    const file = path.join(this.dir, `defs-v4-${version.replace(/[^\w.-]/g, '_')}.json`);
 
     try {
       this.data = JSON.parse(await fs.readFile(file, 'utf8')) as ZenDefsData;
@@ -144,7 +144,11 @@ export class ZenDefs {
             c.socketIndexes,
           ]),
         };
-      } else if (name && [2, 14, 16, 21, 22, 24].includes(it.itemType ?? -1) && !it.plug) {
+      } else if (
+        name &&
+        ([2, 14, 16, 21, 22, 24, 28].includes(it.itemType ?? -1) ||
+          /artifact/i.test(it.itemTypeDisplayName ?? ''))
+      ) {
         gear[hash] = [name, it.itemTypeDisplayName ?? ''];
       } else if (it.plug && name) {
         plugs[hash] = {
