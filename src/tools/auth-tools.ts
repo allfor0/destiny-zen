@@ -36,6 +36,41 @@ export async function authedGet<T>(
   return body.Response;
 }
 
+/**
+ * Authenticated POST against the Bungie API (write actions). Ids that are int64 in Bungie's
+ * schema must be passed as strings so JavaScript does not lose precision.
+ */
+export async function authedPost<T>(
+  oauth: BungieOAuth,
+  apiKey: string,
+  endpoint: string,
+  body: unknown
+): Promise<T> {
+  const token = await oauth.getAccessToken();
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'X-API-Key': apiKey,
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let parsed: BungieEnvelope<T>;
+  try {
+    parsed = JSON.parse(text) as BungieEnvelope<T>;
+  } catch {
+    throw new Error(`Bungie API ${res.status} ${res.statusText}: ${text.slice(0, 300)}`);
+  }
+  if (parsed.ErrorCode !== 1) {
+    throw new Error(
+      `Bungie API error ${parsed.ErrorCode} ${parsed.ErrorStatus}: ${parsed.Message}`
+    );
+  }
+  return parsed.Response;
+}
+
 interface UserMembershipData {
   destinyMemberships: Array<{
     membershipType: number;

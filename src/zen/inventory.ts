@@ -38,7 +38,7 @@ export interface PerkColumn {
   selected: string;
   selectedHash: number;
   /** Every option the weapon rolled in this column (names), selected one included */
-  options: Array<{ name: string; hash: number; enhanced: boolean }>;
+  options: Array<{ name: string; hash: number; enhanced: boolean; canInsert: boolean }>;
 }
 
 export interface WeaponRow {
@@ -114,6 +114,7 @@ interface Membership {
 export class InventoryService {
   private membership: Membership | null = null;
   private cache: { at: number; rows: WeaponRow[] } | null = null;
+  private characterIds: string[] = [];
 
   constructor(
     private readonly oauth: BungieOAuth,
@@ -145,8 +146,15 @@ export class InventoryService {
       `/Destiny2/${m.membershipType}/Profile/${m.membershipId}/?components=${PROFILE_COMPONENTS}`
     );
     const rows = buildRows(profile, defs);
+    this.characterIds = Object.keys(profile.characters?.data ?? {});
     this.cache = { at: Date.now(), rows };
     return rows;
+  }
+
+  /** Character ids on the account (read after the first getWeapons call). */
+  async getCharacterIds(): Promise<string[]> {
+    if (!this.characterIds.length) await this.getWeapons();
+    return this.characterIds;
   }
 
   /** Drop the cache so the next read is fresh (after a write action). */
@@ -220,7 +228,9 @@ export function buildRows(profile: ProfileResponse, defs: ZenDefsData): WeaponRo
     for (const i of catIndexes(perksCats)) {
       const sel = sockets[i]?.plugHash;
       if (!sel) continue;
-      const optionHashes = (plugOptions[String(i)] ?? []).map((p) => p.plugItemHash);
+      const optionList = plugOptions[String(i)] ?? [];
+      const optionHashes = optionList.map((p) => p.plugItemHash);
+      const insertable = new Map(optionList.map((p) => [p.plugItemHash, p.canInsert !== false]));
       const all = optionHashes.length ? optionHashes : [sel];
       if (!all.includes(sel)) all.unshift(sel);
       const selName = plugName(sel);
@@ -234,6 +244,7 @@ export function buildRows(profile: ProfileResponse, defs: ZenDefsData): WeaponRo
           name: plugName(h),
           hash: h,
           enhanced: /enhanced/i.test(plugType(h)),
+          canInsert: h === sel || (insertable.get(h) ?? false),
         })),
       });
     }
