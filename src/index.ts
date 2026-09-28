@@ -57,7 +57,7 @@ if (!isValidApiKeyFormat(config.BUNGIE_API_KEY)) {
 
 // Create the MCP server
 const server = new McpServer({
-  name: 'destiny2-mcp-server',
+  name: 'destiny-zen',
   version: VERSION,
 });
 

@@ -36,7 +36,9 @@ const EnvSchema = z
     DESTINY_ZEN_EXPORT_DIR: z
       .string()
       .optional()
-      .describe('Folder for export_weapons files (default ~/.destiny-zen/exports)'),
+      .describe(
+        'Folder for export_weapons and export_armor files (default ~/.destiny-zen/exports)'
+      ),
 
     // Optional with defaults
     LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info').describe('Logging level'),
@@ -162,7 +164,7 @@ export function isValidApiKeyFormat(key: string): boolean {
  */
 export function getConfigHelp(): string {
   return `
-Destiny 2 MCP Server Configuration
+Destiny Zen Configuration
 ==================================
 
 Required Environment Variables:

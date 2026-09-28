@@ -3,7 +3,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
-const CACHE_DIR = join(homedir(), '.destiny2-mcp', 'cache', 'raidhub');
+const CACHE_DIR = join(homedir(), '.destiny-zen', 'cache', 'raidhub');
 
 export interface CachedLeaderboard {
   key: string; // unique key (e.g., contest:raidSlug or teamfirst:activity:version)

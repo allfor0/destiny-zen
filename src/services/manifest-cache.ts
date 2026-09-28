@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Cache directory in user's home directory (works for global installs)
-const CACHE_DIR = join(homedir(), '.destiny2-mcp', 'cache');
+const CACHE_DIR = join(homedir(), '.destiny-zen', 'cache');
 const MANIFEST_VERSION_FILE = join(CACHE_DIR, 'manifest-version.json');
 const ITEMS_CACHE_FILE = join(CACHE_DIR, 'items.json');
 

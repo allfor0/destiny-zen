@@ -1,495 +1,237 @@
-# Destiny 2 MCP Server
+# Destiny Zen
 
-Production-ready Model Context Protocol (MCP) server for Destiny 2, providing player lookup, activity tracking, item/perk resolution via local manifest cache, clan roster access, and day-one triumph confidence scoring.
+A personal Model Context Protocol (MCP) server for Destiny 2. It signs in to your own Bungie account and lets an AI assistant such as Claude read your vault, armour and loadouts, and change your gear: equip items, set weapon perks, fit armour mods, configure subclasses and artifact perks, and save in-game loadouts. A complete build can be applied without DIM.
 
-## Features
+It also keeps a set of public lookup tools (players, activities, items, clans, World's First leaderboards) that need only an API key.
 
-| Area | Capabilities |
-|------|-------------|
-| **Players** | Fuzzy/exact Bungie name search, profiles, characters, equipment |
-| **Activities** | History with auto name resolution, PGCR, lifetime stats |
-| **Items** | Full sockets/perks, plug sets, activity definitions, images (base64) |
-| **Clans** | Direct roster lookup via cached groupId, elite rank scoring |
-| **Triumphs** | Day-one/contest raid detection with weighted scoring |
-| **Prompts** | Guided workflows for common queries |
+Destiny Zen started as a fork of [Nadiar/destiny2-mcp-server](https://github.com/Nadiar/destiny2-mcp-server) and is developed as its own project.
 
-## Quick Start
+## What it can do
 
-### Installation
+| Area | Tools |
+|---|---|
+| Sign-in | `auth_status`, `get_my_account` |
+| Weapons | `get_weapons`, `get_weapon`, `export_weapons`, `set_perks` |
+| Armour and items | `get_armor`, `export_armor`, `get_item`, `get_equipped` |
+| Builds | `set_sockets` (armour mods, subclass abilities, aspects, fragments, artifact perks), `equip_items` |
+| Inventory | `transfer_items`, `pull_from_postmaster`, `set_lock` |
+| In-game loadouts | `get_loadouts`, `equip_loadout`, `snapshot_loadout`, `rename_loadout`, `clear_loadout` |
+| Account | `get_currencies`, `get_crafted`, `get_artifact`, `get_collectibles`, `get_vendors`, `get_weapon_history` |
+| Public lookups | Player search, profiles, activity history and stats, PGCRs, manifest items and plug sets, clan rosters, World's First and RaidHub leaderboards |
 
-**Option 1: npm (Node.js required)**
-```bash
-npm install -g destiny2-mcp-server
-```
+All write actions are "free and reversible" changes that Bungie allows third-party apps to make (the same class of action DIM uses). Nothing spends currency.
 
-**Option 2: Docker (recommended for production)**
-```bash
-docker pull ghcr.io/nadiar/destiny2-mcp-server:latest
-```
+## Setup
 
-See [Docker Deployment Guide](docs/DOCKER.md) for detailed Docker setup.
+### 1. Register a Bungie application
 
-### Configuration
+At [bungie.net/en/Application](https://www.bungie.net/en/Application) create an application with:
 
-#### 1. Create Bungie API Application
+| Setting | Value |
+|---|---|
+| Application status | Private |
+| OAuth client type | **Confidential** |
+| Redirect URL | `https://localhost:7777/callback` |
+| Scopes | Read your Destiny 2 information (vault, inventory, vendors); Move or equip your Destiny gear |
+| Origin header | Leave empty |
 
-Go to [Bungie Developer Portal](https://www.bungie.net/en/Application) and create a new application:
+Note the **API key**, **OAuth client_id** and **OAuth client_secret**.
 
-**Required Settings:**
+### 2. Install and build
 
-- **Application Name**: `MCP Server for LLM` (or your preferred name)
-- **Application Status**: `Private`
-- **OAuth Client Type**: `Not applicable`
-- **Redirect URL**: Leave empty
-- **Scope**: Not applicable (server uses API key only, no OAuth)
-- **Origin Header**: `*`
-
-After creating, copy your **API Key** (32-character hex string).
-
-#### 2. Create .env file
-
-```env
-BUNGIE_API_KEY=your-32-character-hex-key
-```
-
-### Running
+Requires Node.js 18 or later.
 
 ```bash
-# Global install
-destiny2-mcp-server
-
-# Or from source
+git clone https://github.com/allfor0/destiny-zen.git
+cd destiny-zen
 npm install
 npm run build
-npm start
 ```
 
-## MCP Client Configuration
+### 3. Create `.env`
 
-### Claude Desktop (npm installation)
+In the project folder:
 
-Add to claude_desktop_config.json:
+```env
+BUNGIE_API_KEY=your-32-character-api-key
+BUNGIE_CLIENT_ID=your-client-id
+BUNGIE_CLIENT_SECRET=your-client-secret
+```
+
+Without the client id and secret the server still runs, but only the public tools are registered.
+
+### 4. Sign in
+
+```bash
+npm run auth
+```
+
+This opens the Bungie authorisation page and starts a local HTTPS listener on `https://localhost:7777/callback` with a self-signed certificate. Approve the app on Bungie, then accept the browser's certificate warning (Advanced > Continue). Tokens are saved to `~/.destiny-zen/tokens.json` and refreshed automatically.
+
+**Sign-in lasts 90 days.** `auth_status` shows the expiry date and warns 14 days before it. To renew, run `npm run auth` again and restart your MCP client.
+
+### 5. Add it to Claude Desktop
+
+In `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
-    "destiny2": {
-      "command": "destiny2-mcp-server",
+    "DestinyZen": {
+      "command": "node",
+      "args": ["C:\\path\\to\\destiny-zen\\dist\\index.js"],
       "env": {
-        "BUNGIE_API_KEY": "your-api-key"
+        "BUNGIE_API_KEY": "your-api-key",
+        "BUNGIE_CLIENT_ID": "your-client-id",
+        "BUNGIE_CLIENT_SECRET": "your-client-secret"
       }
     }
   }
 }
 ```
 
-### Claude Desktop (Docker)
+Quit Claude fully (system tray) and reopen it. Run `auth_status` to confirm the sign-in.
 
-For Docker deployment, use:
+The first signed-in call downloads the parts of the Destiny 2 manifest Destiny Zen needs (about a minute) and caches them in `~/.destiny-zen/`. It downloads again only when Bungie publishes a new manifest or the cache format changes.
 
-```json
-{
-  "mcpServers": {
-    "destiny2": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "-e", "BUNGIE_API_KEY=your-api-key-here",
-        "ghcr.io/nadiar/destiny2-mcp-server:latest"
-      ]
-    }
-  }
-}
-```
+## Signed-in tools
 
-### Docker MCP Gateway (Recommended)
+### Reading
 
-For [Docker MCP Gateway](https://github.com/docker/mcp-gateway) users, this server is available in the official Docker MCP catalog:
+| Tool | Returns |
+|---|---|
+| `auth_status` | Sign-in state and expiry |
+| `get_my_account` | Bungie name and memberships, marking the cross-save primary |
+| `get_weapons` | Every weapon (vault and characters) with each rolled option per perk column, selected option marked, frame, masterwork, mod, element, tier, lock state, stats. Filters: name, type, perk, location; paged |
+| `get_weapon` | One weapon in full, with socket indexes and plug hashes |
+| `export_weapons` | CSV and JSON of all weapons, for scripts |
+| `get_armor` | Every armour piece with live stats (masterwork and mods included), total, energy, tier, archetype, set bonus, mods and tuning. Filters: class, slot, name, rarity, location, plug, minimum stat; sort by stat |
+| `export_armor` | CSV and JSON of all armour |
+| `get_item` | Any item by instance id: stats, energy and every socket with its index. `options: true` lists what each socket can take |
+| `get_equipped` | Everything on a character: weapons, armour with stats and mods, subclass setup, artifact, armour stat totals, and the ids of the character's other subclasses |
+| `get_artifact` | The equipped artifact's perk in each slot; `options: true` lists the perks each slot can take |
+| `get_loadouts` | In-game loadouts per character; `detail: true` includes mods, aspects and fragments |
+| `get_currencies` | Glimmer, Bright Dust, Enhancement Cores and Prisms, Ascendant materials and other consumables |
+| `get_crafted` | Crafted weapons with weapon level, level progress and shaping date |
+| `get_collectibles` | Exotic armour or weapons (or everything) acquired or missing, with source |
+| `get_vendors` | What vendors sell a character now (weapons and armour by default, with armour stats and costs) |
+| `get_weapon_history` | Kills, precision kills and precision % per weapon (Bungie tracks mainly exotics here) |
 
-> **Note**: This requires [PR #883](https://github.com/docker/mcp-registry/pull/883) to be merged. Check the PR status before using these commands.
+### Changing
 
-```bash
-# Enable the server from the official catalog
-docker mcp server enable destiny2-mcp-server
+| Tool | Does |
+|---|---|
+| `equip_items` | Moves items to a character (from the vault or another character) and equips them, subclass included. Makes room if a slot is full. Retries once if an exotic clash blocked an item |
+| `transfer_items` | Moves items to the vault or a character without equipping |
+| `pull_from_postmaster` | Lists, pulls chosen, or pulls all Postmaster items |
+| `set_lock` | Locks or unlocks items |
+| `set_perks` | Switches weapons between perks, barrels and magazines they already rolled. Works on vault items |
+| `set_sockets` | Inserts plugs by name into any free socket: armour stat, tuning and utility mods, subclass super, abilities, aspects and fragments, artifact perks, weapon perks. Picks the socket automatically unless `socketIndex` is given |
+| `equip_loadout` | Equips a saved in-game loadout |
+| `snapshot_loadout` | Saves the character's current gear into a loadout slot (overwrites it) |
+| `rename_loadout` | Changes a loadout's name, colour or icon |
+| `clear_loadout` | Empties a loadout slot |
 
-# Set your Bungie API key as a secret
-docker mcp secret set destiny2-mcp-server.api_key=your-32-character-hex-key
+`set_perks` and `set_sockets` take up to 30 changes per call. Most write tools support `dryRun: true` to preview.
 
-# Verify installation
-docker mcp server ls
-```
+## Behaviour to know
 
-That's it! The Docker MCP Gateway will automatically pull the image and configure the server.
+- **Character location.** Equipping and socket changes need the character in orbit, in a social space or offline (Bungie error 1634 otherwise).
+- **Read lag.** After a change, Bungie's profile read can show old data for one to two minutes, while the game and DIM update at once. Trust the tool's success result. If `set_sockets` reports a plug "already" fitted straight after a change, wait or pass `force: true`.
+- **`set_sockets` socket choice.** A socket holding a plug you didn't list counts as free. List every plug you want to keep on that item, or give `socketIndex`. Removals ("Empty ... Socket") run first, then plugs in the order given, so set aspects before fragments.
+- **Fragment sockets.** Sockets beyond what the equipped aspects unlock look empty but reject plugs. Give `socketIndex` to replace an existing fragment instead.
+- **Artifact perks** live in the equipped artifact item's sockets (0-6; socket 7 resets the artifact). Bungie's older seasonal-artifact progression data is stale and is not used.
+- **Unlock-based options** (artifact perks and some subclass and armour plugs) come from live plug sets on your profile and character, which `get_item`, `get_artifact` and `set_sockets` read.
+- **Loadout names** must be one of Bungie's presets (Alpha ... Strike, PvE, PvP, Crucible, Trials and so on). Colours and icons accept a number or a name, following the order in the in-game picker:
+  - Colours: black, light grey, dark grey, cyan, steel blue, light blue, blue, navy, gold, brown, green, teal, lime, orange, pink, plum, lilac, indigo, red, maroon, hot pink, wine
+  - Icons: tree, guardian, crucible, solar, void, arc, strand, spider, stasis, swords, iron banner, sword, chevrons, serpent, eye, skull, traveler, wolves, bull, hexagon, wings (descriptive labels; Bungie doesn't name them)
+- **Empty loadout slots** are saved with the first preset name, colour and icon unless you give them. Sending blank values makes Bungie reject the save with error 1622.
+- **In-game loadouts store their own mods and subclass setup**, so changing a shared armour piece or subclass doesn't break other saved loadouts.
+- **Rate limits.** Socket changes are spaced 600 ms apart (Bungie allows 2 per second); transfers 250 ms.
+- **DIM data.** DIM loadouts, tags and notes are stored by DIM, not Bungie, so Destiny Zen can't see them.
 
-**Updating:**
+## Configuration
 
-```bash
-# Pull the latest image
-docker pull ghcr.io/nadiar/destiny2-mcp-server:latest
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `BUNGIE_API_KEY` | Yes | | Bungie API key (32 hex characters) |
+| `BUNGIE_CLIENT_ID` | For signed-in tools | | OAuth client id |
+| `BUNGIE_CLIENT_SECRET` | For signed-in tools | | OAuth client secret |
+| `BUNGIE_REDIRECT_URL` | No | `https://localhost:7777/callback` | Used by `npm run auth`; must match the Bungie app |
+| `DESTINY_ZEN_TOKEN_FILE` | No | `~/.destiny-zen/tokens.json` | Where sign-in tokens are stored |
+| `DESTINY_ZEN_EXPORT_DIR` | No | `~/.destiny-zen/exports` | Folder for `export_weapons` and `export_armor` |
+| `LOG_LEVEL` | No | `info` | debug, info, warn, error |
+| `CACHE_TTL_HOURS` | No | 24 | Public manifest cache lifetime (1-168) |
+| `CACHE_MAX_SIZE_MB` | No | 100 | Public manifest cache size (50-500) |
+| `API_RATE_LIMIT_MS` | No | 150 | Minimum gap between public API requests (50-1000) |
+| `API_MAX_RETRIES` | No | 3 | Public API retries (0-5) |
+| `API_TIMEOUT_MS` | No | 30000 | Public API timeout (5000-60000) |
+| `RAIDHUB_API_KEY` | No | | Enables live RaidHub data |
+| `USE_RAIDHUB` | No | false | Turns on the RaidHub integration (needs the key) |
 
-# Restart your MCP client to use the new version
-```
+## Public tools
 
-## Example Usage
+These need only `BUNGIE_API_KEY`.
 
-Once configured, you can ask your AI assistant questions like:
-
-### Player Lookup
-
-> "Find a player named Guardian"
-
-```text
-Found 3 players matching "Guardian":
-
-1. Guardian#1234 (Confidence: 92/100 - Very High)
-   ⚡ PRIMARY ACCOUNT: Steam (type: 3, id: 4611686018XXXXXXXXX)
-   All Platforms:
-   - Steam: 4611686018XXXXXXXXX ⚡ PRIMARY
-   - Xbox: 4611686018YYYYYYYYY (linked)
-   - PlayStation: 4611686018ZZZZZZZZ (linked)
-   
-   - Playtime: 4,521 hours
-   - Last Played: 12/12/2025 (0 days ago)
-   - Triumph: 25,340 active / 489,230 lifetime
-   - Clan: Math Class [MATH] ⭐ Elite
-   - Day-One Clears: 8 🏆
-
-2. Guardian#5678 (Confidence: 23/100 - Low)
-   ⚡ PRIMARY ACCOUNT: PlayStation (type: 2, id: 4611686018XXXXXXXXX)
-   - Playtime: 12 hours
-   - Last Played: 03/15/2024 (633 days ago)
-   - No clan
-```
-
-### Activity History & Statistics
-
-> "How much time have they spent in Ghosts of the Deep?"
-
-```text
-# Activity Statistics Summary
-
-Analyzed 500 activities, sorted by time played
-
-## By Activity
-
-### Ghosts of the Deep
-- Activities: 145 (127 completed, 87% completion rate)
-- Total Time: 47h 23m
-- Total Kills: 18,940
-- Efficiency: 2.34
-- Date Range: 02/15/2025 - 12/11/2025
-
-### Warlord's Ruin
-- Activities: 98 (94 completed, 96% completion rate)
-- Total Time: 38h 12m
-- Date Range: 11/03/2024 - 12/10/2025
-
-### Grasp of Avarice
-- Activities: 62 (61 completed, 98% completion rate)
-- Total Time: 19h 47m
-
----
-
-## Overall Totals
-
-- Activities: 500
-- Total Time: 115h 32m
-- Date Range: 11/20/2021 - 12/11/2025
-```
-
-### Post-Game Carnage Report (PGCR)
-
-> "Get details on that Salvation's Edge run"
-
-```text
-Post-Game Carnage Report
-Activity: Salvation's Edge (Master)
-Date: 2025-11-28 19:32:15 UTC
-Duration: 1h 23m 47s
-
-Fireteam (6 players):
-┌─────────────────┬───────┬────────┬─────────┬──────────┐
-│ Player          │ Kills │ Deaths │ Assists │ K/D      │
-├─────────────────┼───────┼────────┼─────────┼──────────┤
-│ [REDACTED]#XXXX │   187 │      1 │      42 │   187.00 │
-│ [REDACTED]#XXXX │   156 │      0 │      38 │      ∞   │
-│ [REDACTED]#XXXX │   142 │      2 │      51 │    71.00 │
-│ [REDACTED]#XXXX │   138 │      1 │      44 │   138.00 │
-│ [REDACTED]#XXXX │   121 │      0 │      39 │      ∞   │
-│ [REDACTED]#XXXX │   118 │      0 │      47 │      ∞   │
-└─────────────────┴───────┴────────┴─────────┴──────────┘
-
-Total Team Kills: 862
-Total Team Deaths: 4
-Completion: ✓ Success
-```
-
-### Item/Weapon Lookup
-
-> "What perks can roll on Fatebringer?"
-
-```text
-Fatebringer (Adept)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Type: Hand Cannon (Kinetic)
-Tier: Legendary
-Source: Vault of Glass
-
-Perk Columns:
-├── Column 1: Explosive Payload, Firefly, Opening Shot, Frenzy
-├── Column 2: Tunnel Vision, Rewind Rounds, Kill Clip
-├── Barrel: Hammer-Forged, Smallbore, Corkscrew, Full Bore
-└── Magazine: Accurized Rounds, Tactical Mag, Appended Mag
-
-Curated Roll: Explosive Payload + Firefly
-```
-
-### Item Images
-
-> "Show me the Fatebringer screenshot"
-
-The `get_item_image` tool can return either:
-
-- **Screenshot** (default): Large inspect image (~200KB) - great for detailed weapon views
-- **Icon**: Small inventory icon (~3KB) - useful for quick references
-
-```text
-# Fatebringer
-*Screenshot*
-
-[High-resolution weapon image displayed inline]
-```
-
-Use `imageType: "icon"` parameter for the small inventory icon instead.
-
-### Clan Roster
-
-> "Show me the roster for my clan"
-
-```text
-Clan: Example Clan [EXMP]
-Members: 87/100
-
-Online Now (3):
-  • Player#0001 - Titan (Last: Tower)
-  • Player#0002 - Hunter (Last: Salvation's Edge)
-  • Player#0003 - Warlock (Last: Crucible)
-
-Top by Playtime:
-  1. Player#0004 - 6,234 hours
-  2. Player#0005 - 5,891 hours
-  3. Player#0006 - 5,122 hours
-```
-
-## Available Tools
-
-### Player & Profile Tools
 | Tool | Description |
-|------|-------------|
-| `search_player` | Exact Bungie name lookup (requires #code) |
-| `find_players` | Fuzzy search by partial name with confidence scores + cross-save primary detection |
-| `get_profile` | Full player profile with characters, clan, triumph scores |
-| `get_character` | Detailed character info and equipped gear |
-| `get_activity_history` | Recent activities with time played |
-| `get_activity_stats` | Aggregated activity statistics with pagination (up to 1000), customizable fields, and activity filtering |
-| `get_pgcr` | Post-game carnage report with time data |
-| `get_historical_stats` | Lifetime PvE/PvP statistics by activity |
-| `get_clan_roster` | Full clan member list with online status |
+|---|---|
+| `search_player` | Exact Bungie name lookup (with #code) |
+| `find_players` | Fuzzy name search with confidence scores and cross-save primary detection |
+| `get_profile`, `get_character` | Profile, characters, clan, triumph score, equipped gear |
+| `get_activity_history`, `get_activity_stats` | Activity history with names; aggregated stats over up to 1000 activities |
+| `get_pgcr`, `get_historical_stats` | Post-game carnage reports; lifetime stats |
+| `get_manifest`, `get_item_definition`, `search_items`, `get_item_details`, `get_item_image`, `get_plug_set`, `get_activity_definition` | Manifest lookups: items, perks, plug sets, activities, images |
+| `search_clan_members` | Clan roster by name or via a known member |
+| `list_leaderboards`, `get_leaderboard`, `get_worlds_first`, `search_leaderboard_player`, `get_leaderboard_pgcr`, `compare_leaderboard_players`, `get_leaderboard_stats`, `filter_leaderboard_entries` | World's First contest leaderboards (bundled data in `leaderboard-data/`) |
+| `raidhub_public_leaderboard` (+ live `raidhub_*` tools with a RaidHub key) | RaidHub leaderboards, player search, PGCRs |
 
-### Item Tools
-| Tool | Description |
-|------|-------------|
-| `search_items` | Search weapons/armor by name |
-| `get_item_details` | Full item info with perks, stats, and plug sets |
-| `get_item_image` | Item screenshot or icon (supports imageType parameter) |
-| `get_activity_definition` | Activity/encounter details from manifest |
-| `get_plug_set` | Available perks for specific weapon/armor slots |
+Prompts: `weapon_perk_lookup`, `activity_count_lookup`, `player_lookup`, `weapon_image_lookup`, `destiny_hash_system`, `pantheon_helper`.
 
-### World's First Leaderboard Tools
-| Tool | Description |
-|------|-------------|
-| `list_leaderboards` | List all available World's First contest leaderboards |
-| `get_leaderboard` | Get top 100 contest completions for a raid/dungeon |
-| `get_worlds_first` | Get World's First winner details for an activity |
-| `search_leaderboard_player` | Find a player's contest completions across all activities |
-| `get_leaderboard_pgcr` | Get detailed player stats for a specific leaderboard entry |
-| `compare_leaderboard_players` | Compare two players' World's First achievements |
-| `get_leaderboard_stats` | Aggregate statistics across all leaderboards |
-| `filter_leaderboard_entries` | Filter leaderboard entries by activity, rank, or player name |
-#### Example: Filter Leaderboard Entries
-
-> "Show me all top 10 Salvation's Edge runs with Datto in the fireteam"
-
-```typescript
-{
-  activity: "Salvation's Edge",
-  minRank: 1,
-  maxRank: 10,
-  player: "Datto"
-}
-```
-
-Returns a list of leaderboard entries matching the filters, including rank, player names, and completion time.
-
-## Releases and Updates
-
-### Latest Release
-
-Docker images and npm packages are automatically published on each release:
-- **Docker**: `ghcr.io/nadiar/destiny2-mcp-server:latest` or `:1.2.4`
-- **npm**: `npm install -g destiny2-mcp-server@latest`
-
-View all releases: [GitHub Releases](https://github.com/Nadiar/destiny2-mcp-server/releases)
-
-### Updating
-
-**npm installation:**
-```bash
-npm update -g destiny2-mcp-server
-```
-
-**Docker installation:**
-```bash
-# Pull latest version
-docker pull ghcr.io/nadiar/destiny2-mcp-server:latest
-
-# Or pull specific version
-docker pull ghcr.io/nadiar/destiny2-mcp-server:1.2.4
-```
-
-After updating, restart your MCP client (Claude Desktop, etc.).
-
-## Documentation
-
-- **[API Reference](docs/API.md)** - Complete tool reference with examples
-- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to the project
-- **[Docker Deployment](docs/DOCKER.md)** - Running with Docker
-- **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+More detail on the public tools: [docs/API.md](docs/API.md), [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md). Docker notes in [docs/DOCKER.md](docs/DOCKER.md) cover the public tools only; the sign-in flow needs a local token file.
 
 ## Development
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and contribution guidelines.
-
-## CI/CD
-
-This project uses GitHub Actions for continuous integration and deployment:
-
-- **CI**: Runs on every push and pull request
-  - Tests on Node.js 18, 20, and 22
-  - Linting and formatting checks
-  - Security audits
-  - Docker image builds
-  - Code coverage reports
-
-- **Release**: Automated releases on version tags
-  - Publishes to npm registry
-  - Builds and pushes Docker images to GitHub Container Registry
-  - Creates GitHub releases with auto-generated notes
-
-- **Dependabot**: Automated dependency updates
-  - Weekly checks for npm, GitHub Actions, and Docker base images
-  - Grouped minor/patch updates
-  - Security vulnerability alerts
-
-## Adding to MCP Toolkit Registry
-
-To make this server discoverable in the [MCP Toolkit Registry](https://github.com/modelcontextprotocol/servers):
-
-### 1. Fork the MCP Servers Repository
-
 ```bash
-# Fork https://github.com/modelcontextprotocol/servers on GitHub
-git clone https://github.com/YOUR_USERNAME/servers.git
-cd servers
+npm run build      # TypeScript to dist/
+npm test           # unit tests (Vitest)
+npm run lint
+npm run dev        # watch mode with tsx
 ```
 
-### 2. Add Server Entry
+After a rebuild, restart the MCP client so it loads the new `dist/`.
 
-Create a new entry in `src/servers.json`:
+### Code layout (Destiny Zen parts)
 
-```json
-{
-  "name": "destiny2-mcp-server",
-  "description": "Destiny 2 API integration with player lookup, activity tracking, item/perk resolution, clan management, and day-one triumph scoring",
-  "repository": "https://github.com/Nadiar/destiny2-mcp-server",
-  "icon": "https://www.bungie.net/img/theme/destiny/icons/icon_d2.png",
-  "categories": ["gaming", "api"],
-  "installation": {
-    "npm": "destiny2-mcp-server",
-    "docker": "ghcr.io/nadiar/destiny2-mcp-server"
-  },
-  "configuration": {
-    "required": {
-      "BUNGIE_API_KEY": "Your Bungie API key from https://www.bungie.net/en/Application"
-    },
-    "optional": {
-      "LOG_LEVEL": "Logging level (debug, info, warn, error)",
-      "CACHE_TTL_HOURS": "Manifest cache TTL in hours (1-168)",
-      "API_RATE_LIMIT_MS": "Minimum ms between API requests (50-1000)"
-    }
-  },
-  "features": [
-    "Fuzzy player search by Bungie name",
-    "Activity history with automatic name resolution",
-    "Post-game carnage reports (PGCR)",
-    "Item/weapon perk lookups via local manifest cache",
-    "Clan roster management",
-    "Day-one raid completion detection",
-    "Item images (screenshots and icons)",
-    "Lifetime statistics tracking"
-  ]
-}
-```
+| Path | Contents |
+|---|---|
+| `src/auth/oauth.ts`, `src/auth/cli.ts` | OAuth token exchange and refresh; `npm run auth` sign-in |
+| `src/zen/defs.ts` | Compact manifest definitions cached per manifest version (`~/.destiny-zen/defs-v7-*.json`) |
+| `src/zen/inventory.ts` | Profile reads: weapons, loadouts, raw component reads |
+| `src/zen/sockets.ts` | Socket resolution from item and plug-set definitions plus live plug sets |
+| `src/zen/common.ts` | Shared helpers, Bungie error-code names |
+| `src/tools/auth-tools.ts` | Sign-in tools; `authedGet` / `authedPost` helpers |
+| `src/tools/inventory-tools.ts` | Weapon reads and export |
+| `src/tools/perk-tools.ts` | `set_perks` |
+| `src/tools/armor-tools.ts` | Armour, item and equipped reads |
+| `src/tools/socket-tools.ts` | `set_sockets` |
+| `src/tools/item-tools.ts` | Equip, transfer, lock, Postmaster |
+| `src/tools/loadout-tools.ts` | In-game loadouts |
+| `src/tools/account-tools.ts` | Currencies, crafted, artifact, collectibles, vendors, weapon history |
 
-### 3. Submit Pull Request
+Bungie API reference: [bungie-net.github.io](https://bungie-net.github.io/) and the OpenAPI spec at [github.com/Bungie-net/api](https://github.com/Bungie-net/api). Write actions use the `MoveEquipDestinyItems` scope; paid socket changes (`InsertSocketPlug`) are not available to third-party apps.
 
-```bash
-git checkout -b add-destiny2-mcp-server
-git add src/servers.json
-git commit -m "Add destiny2-mcp-server to registry"
-git push origin add-destiny2-mcp-server
+## History
 
-# Create PR on GitHub: https://github.com/modelcontextprotocol/servers
-```
+| Phase | Added |
+|---|---|
+| 0 | Fork, build, Claude Desktop registration |
+| 1 | Bungie OAuth sign-in (`npm run auth`), `auth_status`, `get_my_account` |
+| 2 | Live weapon inventory: `get_weapons`, `get_weapon`, `export_weapons` |
+| 3 | `set_perks`; in-game loadout tools |
+| 4 | `equip_items` |
+| 5 | Armour, item and equipped reads; `set_sockets`; transfer, lock, Postmaster, clear loadout; currencies, crafted, artifact, collectibles, vendors, weapon history; `snapshot_loadout` fix for empty slots; loadout colour and icon names |
+| 6 | Renamed from destiny2-mcp-server to destiny-zen throughout (package, MCP server name, docs, Docker labels); all local data now under `~/.destiny-zen/` (the public manifest cache moved from `~/.destiny2-mcp/cache`); README rewritten |
 
-### 4. PR Guidelines
+## Licence
 
-- Ensure all tests pass
-- Server must be publicly available (npm/Docker)
-- Documentation should be complete
-- Follow the [contribution guidelines](https://github.com/modelcontextprotocol/servers/blob/main/CONTRIBUTING.md)
-
-### Alternative: Use MCP Config Generator
-
-Users can also add this server manually using the MCP toolkit:
-
-```bash
-# Using npm
-mcp install destiny2-mcp-server
-
-# Or add to Claude Desktop config manually (see MCP Client Configuration above)
-```
-
-## License
-
-MIT - See LICENSE file for details.
-
-## Leaderboard Data
-
-Pre-scraped World's First leaderboard data from raid.report and dungeon.report is included in `leaderboard-data/`:
-
-- **leaderboards-enriched.json** - Full data with player Bungie IDs, character classes, and stats
-- **leaderboards.json** - Basic data with PGCR IDs only
-
-### Included Activities
-
-**Raids (11):** Last Wish, Garden of Salvation, Deep Stone Crypt, Vault of Glass, Vow of the Disciple, King's Fall, Root of Nightmares, Crota's End, Salvation's Edge, Desert Perpetual (Contest + Epic Contest)
-
-**Dungeons (11):** Shattered Throne, Pit of Heresy, Prophecy, Grasp of Avarice, Duality, Spire of the Watcher, Ghosts of the Deep, Warlord's Ruin, Vesper's Host, Sundered Doctrine, Equilibrium
-
-Each entry includes:
-- Rank and completion time
-- PGCR ID for verification
-- Full fireteam with Bungie names and membership IDs
-- Character class and light level
-- Kill/death/assist stats per player
+MIT. See [LICENSE](LICENSE). Includes code from Nadiar/destiny2-mcp-server (MIT).

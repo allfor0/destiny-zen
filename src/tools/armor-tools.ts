@@ -2,6 +2,7 @@
  * Armour and item reads: get_armor, export_armor, get_item, get_equipped.
  */
 import { promises as fs } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -289,7 +290,7 @@ export function registerArmorTools(
     async ({ refresh }) => {
       try {
         const rows = await armor(refresh ?? true);
-        const dir = exportDir || process.cwd();
+        const dir = exportDir || path.join(os.homedir(), '.destiny-zen', 'exports');
         await fs.mkdir(dir, { recursive: true });
         const day = new Date().toISOString().slice(0, 10);
         const base = path.join(dir, `zen-armor-${day}`);
