@@ -1,217 +1,123 @@
-# Contributing to Destiny 2 MCP Server
+# Contributing to Destiny Zen
 
-Thank you for your interest in contributing! This document provides guidelines and information about contributing to this project.
+Destiny Zen is a personal project, developed in the open. Issues and pull requests are welcome; changes that touch a user's gear get extra scrutiny because they act on real Bungie accounts.
 
-## Development Setup
+## Development setup
 
 ### Prerequisites
 
-- Node.js 18.x or later
-- npm 8.x or later
-- A Bungie API key (get one at https://www.bungie.net/en/Application)
+- Node.js 18 or later, npm 8 or later
+- A Bungie application (see the README, "Register a Bungie application"): API key, plus OAuth client id and secret for the signed-in tools
+- A Destiny 2 account to test against. Use characters and items you don't mind changing.
 
-### Getting Started
+### Getting started
 
-1. Fork the repository
-2. Clone your fork:
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/destiny2-mcp-server.git
-   cd destiny2-mcp-server
-   ```
+```bash
+git clone https://github.com/allfor0/destiny-zen.git
+cd destiny-zen
+npm install
+cp .env.example .env      # then add BUNGIE_API_KEY, BUNGIE_CLIENT_ID, BUNGIE_CLIENT_SECRET
+npm run build
+npm run auth              # one-off Bungie sign-in; tokens go to ~/.destiny-zen/tokens.json
+```
 
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
+Point your MCP client at `dist/index.js` (see the README) and restart it after every rebuild so it loads the new code. `npm run dev` runs the server in watch mode for quick checks outside a client.
 
-4. Copy the example environment file:
-   ```bash
-   cp .env.example .env
-   ```
-
-5. Add your Bungie API key to `.env`
-
-6. Run the development server:
-   ```bash
-   npm run dev
-   ```
-
-## Development Commands
+## Commands
 
 | Command | Description |
-|---------|-------------|
-| `npm run dev` | Start development server with watch mode |
-| `npm run dev:once` | Run once without watch |
-| `npm run build` | Build for production |
-| `npm run test` | Run unit tests (no API key needed) |
-| `npm run test:watch` | Run unit tests in watch mode |
-| `npm run test:coverage` | Run unit tests with coverage |
-| `npm run test:integration` | Run integration tests (requires .env with API key) |
-| `npm run test:all` | Run all tests (unit + integration) |
-| `npm run lint` | Check for lint errors |
-| `npm run lint:fix` | Fix lint errors automatically |
-| `npm run format` | Format code with Prettier |
-| `npm run format:check` | Check formatting |
-| `npm run typecheck` | Run TypeScript type checking |
+|---|---|
+| `npm run build` | Compile TypeScript to `dist/` |
+| `npm run auth` | Bungie sign-in (renew every 90 days) |
+| `npm run dev` / `npm run dev:once` | Run from source with / without watch |
+| `npm test` | Unit tests (no API key needed) |
+| `npm run test:watch` / `npm run test:coverage` | Watch mode / coverage |
+| `npm run test:integration` | Public API integration tests (needs `BUNGIE_API_KEY` in `.env`) |
+| `npm run test:all` | Unit and integration tests |
+| `npm run lint` / `npm run lint:fix` | ESLint |
+| `npm run format` / `npm run format:check` | Prettier |
+| `npm run typecheck` | TypeScript type check |
+| `npm run audit:security` | npm audit |
 
-## Code Style
+### Before committing
 
-This project uses:
-- **TypeScript** for type safety
-- **ESLint** for linting
-- **Prettier** for formatting
+```bash
+npm run typecheck
+npm run lint
+npm test
+npm run format
+```
 
-### Before Committing
+Husky pre-commit hooks run some of these automatically.
 
-1. Run type checking: `npm run typecheck`
-2. Run linting: `npm run lint`
-3. Run tests: `npm run test`
-4. Format your code: `npm run format`
-
-If you have Husky installed, pre-commit hooks will run automatically.
-
-## Project Structure
+## Project structure
 
 ```
 src/
-├── api/                  # Bungie API client
-│   ├── bungie-client.ts  # API client with retry logic
-│   └── index.ts          # Exports
-├── data/                 # Static data files
-│   ├── day-one-triumphs.ts
-│   └── watermark-seasons.json
-├── services/             # Business logic
-│   ├── logger.ts         # Logging utility
-│   ├── manifest-cache.ts # Item manifest caching
-│   └── index.ts          # Exports
-├── tools/                # MCP tool implementations
-│   ├── destiny-tools.ts  # All Destiny 2 tools
-│   └── index.ts          # Exports
-├── types/                # TypeScript types
-│   └── index.ts          # All type definitions
-├── config.ts             # Configuration management
-└── index.ts              # Entry point
-tests/
-├── setup.ts              # Test setup and helpers
-├── config.test.ts        # Config unit tests
-├── bungie-client.test.ts # API client unit tests
-└── integration/          # Integration tests (require real API key)
-    ├── api.integration.test.ts
-    └── cache.integration.test.ts
-docs/
-└── DOCKER.md             # Docker deployment guide
+├── index.ts              # Entry point: config, tool and prompt registration
+├── config.ts             # Environment configuration (zod)
+├── auth/
+│   ├── oauth.ts          # Token exchange and refresh, token file
+│   └── cli.ts            # `npm run auth`: local HTTPS callback sign-in
+├── zen/                  # Signed-in (Destiny Zen) core
+│   ├── defs.ts           # Compact manifest definitions, cached per manifest version
+│   ├── inventory.ts      # Profile reads: weapons, loadouts, raw components
+│   ├── sockets.ts        # Socket and plug-set resolution (incl. live plug sets)
+│   └── common.ts         # Shared helpers, Bungie error-code names
+├── tools/
+│   ├── auth-tools.ts     # auth_status, get_my_account; authedGet/authedPost helpers
+│   ├── inventory-tools.ts# get_weapons, get_weapon, export_weapons
+│   ├── perk-tools.ts     # set_perks
+│   ├── armor-tools.ts    # get_armor, export_armor, get_item, get_equipped
+│   ├── socket-tools.ts   # set_sockets
+│   ├── item-tools.ts     # equip_items, transfer_items, set_lock, pull_from_postmaster
+│   ├── loadout-tools.ts  # get/equip/snapshot/rename/clear loadouts
+│   ├── account-tools.ts  # currencies, crafted, artifact, collectibles, vendors, weapon history
+│   ├── destiny-tools.ts  # Public lookup tools (API key only)
+│   ├── leaderboard-tools.ts, raidhub-tools.ts
+│   └── index.ts
+├── api/                  # Public Bungie and RaidHub API clients
+├── services/             # Logger, public manifest and RaidHub caches (~/.destiny-zen/cache)
+├── data/                 # Static data (day-one triumphs, season watermarks)
+└── types/
+tests/                    # Vitest unit tests; integration/ needs a real API key
+leaderboard-data/         # Bundled World's First data
+docs/                     # API, Docker and troubleshooting notes (public tools)
 ```
 
-## Pull Request Process
+## Adding a tool
 
-1. Create a feature branch from `master`:
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
+1. Put it in the file for its area (see above), or a new `src/tools/*-tools.ts` exported from `src/tools/index.ts` and registered in `src/index.ts`. Signed-in tools register inside the `BUNGIE_CLIENT_ID && BUNGIE_CLIENT_SECRET` block.
+2. Register with `server.tool(name, description, zodSchema, handler)`. The description is what the AI reads to decide when and how to use the tool: say what it returns, what it changes, and its preconditions.
+3. Use `authedGet` / `authedPost` for signed-in calls, and the helpers in `src/zen/common.ts` (`text`, `errorResult`, `describeError`, `cleanId`, `itemName`).
+4. Return plain, compact text. Include item names and instance ids so results can feed the next call.
 
-2. Make your changes
+### Rules for tools that change gear
 
-3. Write or update tests as needed
-
-4. Ensure all checks pass:
-   ```bash
-   npm run typecheck
-   npm run lint
-   npm run test
-   ```
-
-5. Commit with a clear message:
-   ```bash
-   git commit -m "feat: add support for vendor inventory checking"
-   ```
-
-6. Push and create a Pull Request
-
-### Commit Message Format
-
-We follow conventional commits:
-
-- `feat:` New feature
-- `fix:` Bug fix
-- `docs:` Documentation changes
-- `style:` Code style changes (formatting)
-- `refactor:` Code refactoring
-- `test:` Adding or updating tests
-- `chore:` Maintenance tasks
-
-Examples:
-```
-feat: add Xûr inventory checking tool
-fix: handle rate limiting correctly
-docs: update README with Docker instructions
-```
-
-## Adding New Tools
-
-1. Add the tool implementation in `src/tools/destiny-tools.ts`
-2. Use the `server.tool()` method to register it
-3. Include proper Zod schemas for input validation
-4. Add JSDoc documentation
-5. Write tests for the new tool
-
-Example:
-```typescript
-server.tool(
-  'tool_name',
-  'Description of what the tool does',
-  {
-    param: z.string().describe('Parameter description'),
-  },
-  async ({ param }) => {
-    // Implementation
-    return {
-      content: [{
-        type: 'text',
-        text: 'Result',
-      }],
-    };
-  }
-);
-```
+- Only Bungie's free and reversible actions (scope `MoveEquipDestinyItems`). Never anything that spends currency.
+- Offer `dryRun` wherever a batch is possible, and report per-item results rather than one success line.
+- Respect Bungie's limits: 2 socket actions per second (Destiny Zen spaces them 600 ms apart), and keep batches small enough to finish inside an MCP client's timeout (about 30 socket changes).
+- Say what an overwrite replaced (e.g. `snapshot_loadout` reports what the slot held).
+- Expect the profile read to lag 1-2 minutes behind a change; don't build logic that assumes an immediate re-read is current.
+- Int64 ids (item, character, membership) go to Bungie as strings.
+- Add Bungie error codes you meet to `ERROR_NAMES` in `src/zen/common.ts` with a plain-English explanation.
 
 ## Testing
 
-### Unit Tests
+Unit tests mock API responses and need no key. Integration tests hit the public API and need `BUNGIE_API_KEY` in `.env`. There are no automated tests against a signed-in account; for signed-in tools, test with `dryRun` first, then one real, reversible change, and record findings in the pull request.
 
-Unit tests use mocked API responses and don't require a real API key:
+`vitest` uses native rollup binaries, so run tests on the same OS the dependencies were installed on (e.g. install and test on Windows, not from a Linux VM sharing the folder).
 
-```bash
-npm run test           # Run once
-npm run test:watch     # Watch mode
-npm run test:coverage  # With coverage report
-```
+## Pull requests
 
-### Integration Tests
-
-Integration tests make real API calls and require a `.env` file with a valid `BUNGIE_API_KEY`:
-
-```bash
-npm run test:integration        # Run integration tests
-npm run test:integration:watch  # Watch mode
-npm run test:all                # Run all tests (unit + integration)
-```
-
-### Writing Tests
-
-- Write unit tests for new functionality
-- Use the mock setup in `tests/setup.ts`
-- Mock Bungie API responses for consistent unit tests
-- Add integration tests for critical API interactions
-- Run `npm run test:coverage` to check coverage
+1. Branch from `master` (`git checkout -b feature/short-name`).
+2. Make the change, with tests where practical.
+3. Run the checks above.
+4. Commit with a conventional prefix: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:` (e.g. `feat: add vendor stock filter by slot`).
+5. Push and open a pull request describing what changed and how you tested it.
 
 ## Security
 
-- Never commit API keys or secrets
-- Sanitize error messages to prevent key leakage
-- Report security issues privately (see SECURITY.md)
-
-## Questions?
-
-Open an issue for questions or discussions about contributions.
-
-Thank you for contributing! 🚀
+- Never commit `.env`, API keys, client secrets or `tokens.json`.
+- Keep error messages free of keys and tokens.
+- Report vulnerabilities privately (see SECURITY.md).
