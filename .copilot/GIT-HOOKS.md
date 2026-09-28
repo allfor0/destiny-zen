@@ -103,7 +103,7 @@ When cloning the repo, husky hooks are automatically installed:
 
 ```bash
 git clone <repo>
-cd destiny2-mcp-server
+cd destiny-zen
 npm install  # Husky installs hooks via prepare script
 ```
 

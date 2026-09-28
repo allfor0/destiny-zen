@@ -1,6 +1,6 @@
 # Docker Deployment Guide
 
-This guide covers how to deploy the Destiny 2 MCP Server using Docker.
+This guide covers how to deploy the Destiny Zen using Docker.
 
 ## Prerequisites
 
@@ -13,28 +13,28 @@ This guide covers how to deploy the Destiny 2 MCP Server using Docker.
 
 ```bash
 # Clone the repository
-git clone https://github.com/Nadiar/destiny2-mcp-server.git
-cd destiny2-mcp-server
+git clone https://github.com/better-devils/destiny-zen.git
+cd destiny-zen
 
 # Build the Docker image
-docker build -t destiny2-mcp-server .
+docker build -t destiny-zen .
 
 # Run the container
 docker run -it --rm \
   -e BUNGIE_API_KEY=your-api-key-here \
-  destiny2-mcp-server
+  destiny-zen
 ```
 
 ### Option 2: Pull from GitHub Container Registry
 
 ```bash
 # Pull the latest image
-docker pull ghcr.io/nadiar/destiny2-mcp-server:latest
+docker pull ghcr.io/better-devils/destiny-zen:latest
 
 # Run the container
 docker run -it --rm \
   -e BUNGIE_API_KEY=your-api-key-here \
-  ghcr.io/nadiar/destiny2-mcp-server:latest
+  ghcr.io/better-devils/destiny-zen:latest
 ```
 
 ## Configuration
@@ -66,18 +66,18 @@ Run with the env file:
 ```bash
 docker run -it --rm \
   --env-file .env \
-  destiny2-mcp-server
+  destiny-zen
 ```
 
 ## Persistent Cache
 
-The manifest cache is stored at `/home/destiny/.destiny2-mcp/cache`. To persist the cache between container restarts:
+The manifest cache is stored at `/home/destiny/.destiny-zen/cache`. To persist the cache between container restarts:
 
 ```bash
 docker run -it --rm \
   -e BUNGIE_API_KEY=your-api-key-here \
-  -v destiny2-cache:/home/destiny/.destiny2-mcp/cache \
-  destiny2-mcp-server
+  -v destiny-zen-cache:/home/destiny/.destiny-zen/cache \
+  destiny-zen
 ```
 
 Or use a host directory:
@@ -85,8 +85,8 @@ Or use a host directory:
 ```bash
 docker run -it --rm \
   -e BUNGIE_API_KEY=your-api-key-here \
-  -v $(pwd)/.cache:/home/destiny/.destiny2-mcp/cache \
-  destiny2-mcp-server
+  -v $(pwd)/.cache:/home/destiny/.destiny-zen/cache \
+  destiny-zen
 ```
 
 ## Docker Compose
@@ -97,8 +97,8 @@ Create a `docker-compose.yml`:
 version: '3.8'
 
 services:
-  destiny2-mcp:
-    image: ghcr.io/nadiar/destiny2-mcp-server:latest
+  destiny-zen:
+    image: ghcr.io/better-devils/destiny-zen:latest
     # Or build from source:
     # build: .
     environment:
@@ -106,13 +106,13 @@ services:
       - LOG_LEVEL=info
       - CACHE_TTL_HOURS=24
     volumes:
-      - destiny2-cache:/home/destiny/.destiny2-mcp/cache
+      - destiny-zen-cache:/home/destiny/.destiny-zen/cache
     stdin_open: true
     tty: true
     restart: unless-stopped
 
 volumes:
-  destiny2-cache:
+  destiny-zen-cache:
 ```
 
 Run with:
@@ -135,7 +135,7 @@ To use with Claude Desktop (or other MCP clients), add to your configuration:
       "args": [
         "run", "-i", "--rm",
         "-e", "BUNGIE_API_KEY=your-api-key-here",
-        "ghcr.io/nadiar/destiny2-mcp-server:latest"
+        "ghcr.io/better-devils/destiny-zen:latest"
       ]
     }
   }
@@ -152,7 +152,7 @@ To use with Claude Desktop (or other MCP clients), add to your configuration:
       "args": [
         "run", "-i", "--rm",
         "-e", "BUNGIE_API_KEY=your-api-key-here",
-        "ghcr.io/nadiar/destiny2-mcp-server:latest"
+        "ghcr.io/better-devils/destiny-zen:latest"
       ]
     }
   }
@@ -176,7 +176,7 @@ docker run -it --rm \
   -e BUNGIE_API_KEY=your-api-key-here \
   --memory=256m \
   --cpus=0.5 \
-  destiny2-mcp-server
+  destiny-zen
 ```
 
 ## Troubleshooting
@@ -209,7 +209,7 @@ If using a bind mount, ensure the directory is writable:
 ```bash
 mkdir -p .cache
 chmod 777 .cache
-docker run -v $(pwd)/.cache:/home/destiny/.destiny2-mcp/cache ...
+docker run -v $(pwd)/.cache:/home/destiny/.destiny-zen/cache ...
 ```
 
 ## Building Multi-Architecture Images
@@ -219,7 +219,7 @@ To build for multiple architectures:
 ```bash
 docker buildx create --use
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t destiny2-mcp-server:latest .
+  -t destiny-zen:latest .
 ```
 
 ## Security Notes

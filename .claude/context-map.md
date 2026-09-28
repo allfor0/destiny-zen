@@ -1,9 +1,9 @@
-# PROJECT_CONTEXT: destiny2-mcp-server
-Dynamic session state for destiny2-mcp-server.
+# PROJECT_CONTEXT: destiny-zen
+Dynamic session state for destiny-zen.
 
 ## [NOW]
 DATE:2025-12-13.Saturday
-PROJECT:destiny2-mcp-server
+PROJECT:destiny-zen
 
 ## [GIT_STATUS]
 BRANCH:feature/leaderboard-data

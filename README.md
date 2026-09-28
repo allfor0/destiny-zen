@@ -42,7 +42,7 @@ Note the **API key**, **OAuth client_id** and **OAuth client_secret**.
 Requires Node.js 18 or later.
 
 ```bash
-git clone https://github.com/allfor0/destiny-zen.git
+git clone https://github.com/better-devils/destiny-zen.git
 cd destiny-zen
 npm install
 npm run build

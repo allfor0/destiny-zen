@@ -1,11 +1,11 @@
-# Destiny 2 MCP Server - Development Setup
+# Destiny Zen - Development Setup
 
 ## Quick Start
 
 ```bash
 # Clone and setup
-git clone https://github.com/Nadiar/destiny2-mcp-server.git
-cd destiny2-mcp-server
+git clone https://github.com/better-devils/destiny-zen.git
+cd destiny-zen
 npm install
 
 # Create .env file
@@ -54,8 +54,8 @@ npm run build           # Compile TypeScript to dist/
 npm run prepublishOnly  # Lint → Test → Build (runs before npm publish)
 
 # Docker
-docker build -t destiny2-mcp-server:latest .
-docker run -e BUNGIE_API_KEY=<key> destiny2-mcp-server:latest
+docker build -t destiny-zen:latest .
+docker run -e BUNGIE_API_KEY=<key> destiny-zen:latest
 ```
 
 ## Git Workflow
@@ -85,7 +85,7 @@ See [GIT-HOOKS.md](.copilot/GIT-HOOKS.md) for full details.
 ## Project Structure
 
 ```
-destiny2-mcp-server/
+destiny-zen/
 ├── src/
 │   ├── api/                      # Bungie API client
 │   ├── config.ts                 # Configuration management
@@ -147,12 +147,12 @@ npm run test:integration
 
 ### Build
 ```bash
-docker build -t destiny2-mcp-server:latest .
+docker build -t destiny-zen:latest .
 ```
 
 ### Run
 ```bash
-docker run -e BUNGIE_API_KEY=<your-key> destiny2-mcp-server:latest
+docker run -e BUNGIE_API_KEY=<your-key> destiny-zen:latest
 ```
 
 ### With Claude Desktop
@@ -161,7 +161,7 @@ docker run -e BUNGIE_API_KEY=<your-key> destiny2-mcp-server:latest
   "mcpServers": {
     "destiny2": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "-e", "BUNGIE_API_KEY=<key>", "ghcr.io/nadiar/destiny2-mcp-server:latest"]
+      "args": ["run", "-i", "--rm", "-e", "BUNGIE_API_KEY=<key>", "ghcr.io/better-devils/destiny-zen:latest"]
     }
   }
 }

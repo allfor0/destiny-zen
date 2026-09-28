@@ -33,8 +33,8 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
 
 # Create cache directory with proper permissions
-RUN mkdir -p /home/destiny/.destiny2-mcp/cache && \
-    chown -R destiny:nodejs /home/destiny/.destiny2-mcp
+RUN mkdir -p /home/destiny/.destiny-zen/cache && \
+    chown -R destiny:nodejs /home/destiny/.destiny-zen
 
 # Switch to non-root user
 USER destiny
@@ -54,9 +54,9 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 CMD ["node", "dist/index.js"]
 
 # Labels for container metadata
-LABEL org.opencontainers.image.title="Destiny 2 MCP Server" \
+LABEL org.opencontainers.image.title="Destiny Zen" \
       org.opencontainers.image.description="MCP server for Destiny 2 API integration" \
       org.opencontainers.image.version="1.0.2" \
-      org.opencontainers.image.vendor="Destiny 2 MCP Server Contributors" \
+      org.opencontainers.image.vendor="better-devils" \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.source="https://github.com/Nadiar/destiny2-mcp-server"
+      org.opencontainers.image.source="https://github.com/better-devils/destiny-zen"

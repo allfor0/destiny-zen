@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-This guide helps diagnose and resolve common issues with the Destiny 2 MCP Server.
+This guide helps diagnose and resolve common issues with the Destiny Zen.
 
 ## Table of Contents
 
@@ -100,7 +100,7 @@ cat src/config.ts | grep -A 3 "describe"
    {
      "mcpServers": {
        "destiny2": {
-         "command": "destiny2-mcp-server",
+         "command": "destiny-zen",
          "env": {
            "BUNGIE_API_KEY": "your-key"
          }
@@ -131,14 +131,14 @@ cat src/config.ts | grep -A 3 "describe"
 
 3. Clear cache and retry:
    ```bash
-   rm -rf ~/.destiny2-mcp/cache/
+   rm -rf ~/.destiny-zen/cache/
    npm run dev
    ```
 
 4. Check cache permissions:
    ```bash
-   ls -la ~/.destiny2-mcp/
-   chmod -R 755 ~/.destiny2-mcp/
+   ls -la ~/.destiny-zen/
+   chmod -R 755 ~/.destiny-zen/
    ```
 
 ### Cache size issues
@@ -153,7 +153,7 @@ cat src/config.ts | grep -A 3 "describe"
 
 2. Clear cache manually:
    ```bash
-   rm -rf ~/.destiny2-mcp/cache/
+   rm -rf ~/.destiny-zen/cache/
    ```
 
 3. Reduce cache TTL to refresh more often:
@@ -177,7 +177,7 @@ cat src/config.ts | grep -A 3 "describe"
 
 3. Check if multiple instances are running:
    ```bash
-   ps aux | grep destiny2-mcp-server
+   ps aux | grep destiny-zen
    ```
 
 ### API timeout errors
@@ -239,10 +239,10 @@ cat src/config.ts | grep -A 3 "describe"
 The MCP server requires stdin to be connected:
 ```bash
 # Use -it flag for interactive mode
-docker run -it --rm -e BUNGIE_API_KEY=your-key destiny2-mcp-server
+docker run -it --rm -e BUNGIE_API_KEY=your-key destiny-zen
 
 # Or just keep stdin open
-docker run -i --rm -e BUNGIE_API_KEY=your-key destiny2-mcp-server
+docker run -i --rm -e BUNGIE_API_KEY=your-key destiny-zen
 ```
 
 ### Permission denied on volumes
@@ -258,8 +258,8 @@ chmod 777 .cache
 # Run with correct volume mount
 docker run -it --rm \
   -e BUNGIE_API_KEY=your-key \
-  -v $(pwd)/.cache:/home/destiny/.destiny2-mcp/cache \
-  destiny2-mcp-server
+  -v $(pwd)/.cache:/home/destiny/.destiny-zen/cache \
+  destiny-zen
 ```
 
 ### Docker build fails
@@ -274,7 +274,7 @@ docker run -it --rm \
 
 2. Rebuild without cache:
    ```bash
-   docker build --no-cache -t destiny2-mcp-server .
+   docker build --no-cache -t destiny-zen .
    ```
 
 3. Check Docker has enough resources:
@@ -303,12 +303,12 @@ docker run -it --rm \
 **Solution**:
 1. Check if manifest cache is initialized:
    ```bash
-   ls -lh ~/.destiny2-mcp/cache/
+   ls -lh ~/.destiny-zen/cache/
    ```
 
 2. Manifest should be ~30MB. If missing or corrupted:
    ```bash
-   rm -rf ~/.destiny2-mcp/cache/
+   rm -rf ~/.destiny-zen/cache/
    # Restart server to re-download
    ```
 
@@ -333,7 +333,7 @@ docker run -it --rm \
    docker stats <container-id>
    
    # Native
-   ps aux | grep destiny2-mcp-server
+   ps aux | grep destiny-zen
    ```
 
 3. Set memory limits (Docker):
@@ -381,13 +381,13 @@ LOG_LEVEL=debug npm run dev 2>&1 | grep "API request"
 
 ```bash
 # List cache files
-ls -lh ~/.destiny2-mcp/cache/
+ls -lh ~/.destiny-zen/cache/
 
 # Check manifest version
-cat ~/.destiny2-mcp/cache/manifest-version.json
+cat ~/.destiny-zen/cache/manifest-version.json
 
 # Validate cache size
-du -sh ~/.destiny2-mcp/cache/
+du -sh ~/.destiny-zen/cache/
 ```
 
 ### Test with minimal config
@@ -404,7 +404,7 @@ Remove all optional config and test.
 
 If you're still experiencing issues:
 
-1. **Check existing issues**: Search [GitHub Issues](https://github.com/Nadiar/destiny2-mcp-server/issues)
+1. **Check existing issues**: Search [GitHub Issues](https://github.com/better-devils/destiny-zen/issues)
 
 2. **Create a new issue** with:
    - Node.js version: `node --version`
@@ -448,14 +448,14 @@ npm update
 npm audit
 
 # Clear old cache periodically
-rm -rf ~/.destiny2-mcp/cache/manifest-version.json
+rm -rf ~/.destiny-zen/cache/manifest-version.json
 ```
 
 ### Monitor disk space
 
 ```bash
 # Check cache size
-du -sh ~/.destiny2-mcp/cache/
+du -sh ~/.destiny-zen/cache/
 
 # Set up size limits in .env
 CACHE_MAX_SIZE_MB=100
@@ -465,5 +465,5 @@ CACHE_MAX_SIZE_MB=100
 
 ```bash
 # Log to file for debugging
-npm run dev 2>&1 | tee destiny2-mcp.log
+npm run dev 2>&1 | tee destiny-zen.log
 ```

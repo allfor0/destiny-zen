@@ -1,6 +1,6 @@
 # API Reference
 
-Complete reference for all Destiny 2 MCP Server tools.
+Complete reference for all Destiny Zen tools.
 
 ## Table of Contents
 
@@ -548,4 +548,4 @@ Tools that return lists support pagination:
 For issues or questions:
 - Check [Troubleshooting Guide](TROUBLESHOOTING.md)
 - Review [Bungie API Documentation](https://bungie-net.github.io/multi/index.html)
-- Open an issue on [GitHub](https://github.com/Nadiar/destiny2-mcp-server/issues)
+- Open an issue on [GitHub](https://github.com/better-devils/destiny-zen/issues)

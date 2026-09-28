@@ -8,7 +8,7 @@ updates:
       day: "monday"
     open-pull-requests-limit: 10
     reviewers:
-      - "Nadiar"
+      - "allfor0"
     labels:
       - "dependencies"
       - "npm"

@@ -13,7 +13,7 @@ Destiny Zen is a personal project, developed in the open. Issues and pull reques
 ### Getting started
 
 ```bash
-git clone https://github.com/allfor0/destiny-zen.git
+git clone https://github.com/better-devils/destiny-zen.git
 cd destiny-zen
 npm install
 cp .env.example .env      # then add BUNGIE_API_KEY, BUNGIE_CLIENT_ID, BUNGIE_CLIENT_SECRET
