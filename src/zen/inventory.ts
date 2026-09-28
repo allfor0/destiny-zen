@@ -192,6 +192,27 @@ export class InventoryService {
     return this.characterIds;
   }
 
+  /** Raw GetProfile read with any component list (not cached). */
+  async getProfileRaw<T>(components: number[]): Promise<T> {
+    const m = await this.getMembership();
+    return authedGet<T>(
+      this.oauth,
+      this.apiKey,
+      `/Destiny2/${m.membershipType}/Profile/${m.membershipId}/?components=${components.join(',')}`
+    );
+  }
+
+  /** Map of character id -> class name ("Hunter"...). */
+  async getCharacters(): Promise<Map<string, string>> {
+    const p = await this.getProfileRaw<{
+      characters?: { data?: Record<string, { classType: number }> };
+    }>([200]);
+    const out = new Map<string, string>();
+    for (const [id, c] of Object.entries(p.characters?.data ?? {}))
+      out.set(id, CLASS[c.classType] ?? id);
+    return out;
+  }
+
   /** Drop the cache so the next read is fresh (after a write action). */
   invalidate(): void {
     this.cache = null;

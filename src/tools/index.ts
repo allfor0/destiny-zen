@@ -5,3 +5,7 @@ export { registerAuthTools, authedGet, authedPost } from './auth-tools.js';
 export { registerInventoryTools } from './inventory-tools.js';
 export { registerPerkTools } from './perk-tools.js';
 export { registerLoadoutTools } from './loadout-tools.js';
+export { registerItemTools } from './item-tools.js';
+export { registerArmorTools } from './armor-tools.js';
+export { registerSocketTools } from './socket-tools.js';
+export { registerAccountTools } from './account-tools.js';

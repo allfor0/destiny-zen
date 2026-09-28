@@ -13,7 +13,12 @@ import {
   registerInventoryTools,
   registerPerkTools,
   registerLoadoutTools,
+  registerItemTools,
+  registerArmorTools,
+  registerSocketTools,
+  registerAccountTools,
 } from './tools/index.js';
+import { SocketResolver } from './zen/sockets.js';
 import { ZenDefs } from './zen/defs.js';
 import { InventoryService } from './zen/inventory.js';
 import { BungieOAuth } from './auth/oauth.js';
@@ -80,14 +85,24 @@ if (config.BUNGIE_CLIENT_ID && config.BUNGIE_CLIENT_SECRET) {
     tokenFile: config.DESTINY_ZEN_TOKEN_FILE,
   });
   registerAuthTools(server, oauth, config.BUNGIE_API_KEY);
-  const inventory = new InventoryService(
-    oauth,
-    config.BUNGIE_API_KEY,
-    new ZenDefs(config.BUNGIE_API_KEY)
-  );
+  const zenDefs = new ZenDefs(config.BUNGIE_API_KEY);
+  const inventory = new InventoryService(oauth, config.BUNGIE_API_KEY, zenDefs);
   registerInventoryTools(server, inventory, config.DESTINY_ZEN_EXPORT_DIR);
   registerPerkTools(server, oauth, config.BUNGIE_API_KEY, inventory);
   registerLoadoutTools(server, oauth, config.BUNGIE_API_KEY, inventory);
+  registerItemTools(server, oauth, config.BUNGIE_API_KEY, inventory, zenDefs);
+  const socketResolver = new SocketResolver(oauth, config.BUNGIE_API_KEY);
+  registerArmorTools(
+    server,
+    oauth,
+    config.BUNGIE_API_KEY,
+    inventory,
+    zenDefs,
+    socketResolver,
+    config.DESTINY_ZEN_EXPORT_DIR
+  );
+  registerSocketTools(server, oauth, config.BUNGIE_API_KEY, inventory, zenDefs, socketResolver);
+  registerAccountTools(server, oauth, config.BUNGIE_API_KEY, inventory, zenDefs, socketResolver);
   logger.info(`Bungie sign-in tools enabled (token file: ${oauth.tokenFile})`);
 } else {
   logger.warn('BUNGIE_CLIENT_ID/BUNGIE_CLIENT_SECRET not set: sign-in tools disabled');

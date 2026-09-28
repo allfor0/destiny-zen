@@ -42,8 +42,17 @@ export interface ZenDefsData {
   plugs: Record<string, PlugDef>;
   stats: Record<string, string>;
   socketCategories: Record<string, string>;
-  /** Names of other equippable items (armour, subclasses, ghosts...): hash -> [name, type] */
-  gear: Record<string, [string, string]>;
+  /** Other equippable items (armour, subclasses, ghosts, artifacts...):
+   * hash -> [name, type, classType (0 Titan, 1 Hunter, 2 Warlock, 3 any), bucketHash, tierName] */
+  gear: Record<string, [string, string, number, number, string]>;
+  /** Currencies, materials and consumables: hash -> name */
+  misc: Record<string, string>;
+  /** Collectibles: hash -> [name, itemHash, source, itemType, tierName, classType, isPlug (ornament etc.)] */
+  collectibles: Record<string, [string, number, string, number, string, number, boolean]>;
+  /** Vendor names */
+  vendors: Record<string, string>;
+  /** Objective progress descriptions (e.g. "Weapon Level") */
+  objectives: Record<string, string>;
   /** In-game loadout names, colours and icons */
   loadoutNames: Record<string, string>;
   loadoutColors: number[];
@@ -53,8 +62,9 @@ export interface ZenDefsData {
 interface RawItem {
   displayProperties?: { name?: string };
   itemType?: number;
+  classType?: number;
   itemTypeDisplayName?: string;
-  inventory?: { tierTypeName?: string; bucketTypeHash?: number };
+  inventory?: { tierTypeName?: string; tierType?: number; bucketTypeHash?: number };
   equippingBlock?: { ammoType?: number };
   plug?: { plugCategoryIdentifier?: string };
   sockets?: { socketCategories?: Array<{ socketCategoryHash: number; socketIndexes: number[] }> };
@@ -97,7 +107,7 @@ export class ZenDefs {
       };
     }>(`${BASE}/Platform/Destiny2/Manifest/`, true);
     const version = manifest.Response.version;
-    const file = path.join(this.dir, `defs-v4-${version.replace(/[^\w.-]/g, '_')}.json`);
+    const file = path.join(this.dir, `defs-v7-${version.replace(/[^\w.-]/g, '_')}.json`);
 
     try {
       this.data = JSON.parse(await fs.readFile(file, 'utf8')) as ZenDefsData;
@@ -108,7 +118,17 @@ export class ZenDefs {
 
     const paths = manifest.Response.jsonWorldComponentContentPaths.en;
     console.error('[ZenDefs] Downloading manifest definitions (first run, may take a minute)...');
-    const [items, stats, socketCats, loNames, loColors, loIcons] = await Promise.all([
+    const [
+      items,
+      stats,
+      socketCats,
+      loNames,
+      loColors,
+      loIcons,
+      collectibles,
+      vendors,
+      objectives,
+    ] = await Promise.all([
       this.getJson<Record<string, RawItem>>(`${BASE}${paths.DestinyInventoryItemDefinition}`),
       this.getJson<Record<string, { displayProperties?: { name?: string } }>>(
         `${BASE}${paths.DestinyStatDefinition}`
@@ -125,11 +145,24 @@ export class ZenDefs {
       this.getJson<Record<string, { index?: number }>>(
         `${BASE}${paths.DestinyLoadoutIconDefinition}`
       ),
+      this.getJson<
+        Record<
+          string,
+          { displayProperties?: { name?: string }; itemHash?: number; sourceString?: string }
+        >
+      >(`${BASE}${paths.DestinyCollectibleDefinition}`),
+      this.getJson<Record<string, { displayProperties?: { name?: string } }>>(
+        `${BASE}${paths.DestinyVendorDefinition}`
+      ),
+      this.getJson<Record<string, { progressDescription?: string }>>(
+        `${BASE}${paths.DestinyObjectiveDefinition}`
+      ),
     ]);
 
     const weapons: Record<string, WeaponDef> = {};
     const plugs: Record<string, PlugDef> = {};
-    const gear: Record<string, [string, string]> = {};
+    const gear: ZenDefsData['gear'] = {};
+    const misc: Record<string, string> = {};
     for (const [hash, it] of Object.entries(items)) {
       const name = it.displayProperties?.name ?? '';
       if (it.itemType === 3 && name) {
@@ -149,7 +182,19 @@ export class ZenDefs {
         ([2, 14, 16, 21, 22, 24, 28].includes(it.itemType ?? -1) ||
           /artifact/i.test(it.itemTypeDisplayName ?? ''))
       ) {
-        gear[hash] = [name, it.itemTypeDisplayName ?? ''];
+        gear[hash] = [
+          name,
+          it.itemTypeDisplayName ?? '',
+          it.classType ?? 3,
+          it.inventory?.bucketTypeHash ?? 0,
+          it.inventory?.tierTypeName ?? '',
+        ];
+      } else if (
+        name &&
+        !it.plug &&
+        ([1, 9].includes(it.itemType ?? -1) || it.inventory?.bucketTypeHash === 1469714392)
+      ) {
+        misc[hash] = name;
       } else if (it.plug && name) {
         plugs[hash] = {
           n: name,
@@ -167,6 +212,37 @@ export class ZenDefs {
       if (c.displayProperties?.name) catNames[hash] = c.displayProperties.name;
     }
 
+    const collectibleDefs: ZenDefsData['collectibles'] = {};
+    for (const [hash, c] of Object.entries(collectibles)) {
+      const n = c.displayProperties?.name;
+      if (!n || !c.itemHash) continue;
+      const it = items[String(c.itemHash)];
+      const TIER: Record<number, string> = {
+        6: 'Exotic',
+        5: 'Legendary',
+        4: 'Rare',
+        3: 'Common',
+        2: 'Basic',
+      };
+      const armorBuckets = [3448274439, 3551918588, 14239492, 20886954, 1585787867];
+      const bucket = it?.inventory?.bucketTypeHash ?? 0;
+      collectibleDefs[hash] = [
+        n,
+        c.itemHash,
+        c.sourceString ?? '',
+        armorBuckets.includes(bucket) ? 2 : (it?.itemType ?? 0),
+        it?.inventory?.tierTypeName || TIER[it?.inventory?.tierType ?? 0] || '',
+        it?.classType ?? 3,
+        !!it?.plug,
+      ];
+    }
+    const vendorNames: Record<string, string> = {};
+    for (const [hash, v] of Object.entries(vendors))
+      if (v.displayProperties?.name) vendorNames[hash] = v.displayProperties.name;
+    const objectiveDescs: Record<string, string> = {};
+    for (const [hash, o] of Object.entries(objectives))
+      if (o.progressDescription) objectiveDescs[hash] = o.progressDescription;
+
     const loadoutNames: Record<string, string> = {};
     for (const [hash, n] of Object.entries(loNames)) if (n.name) loadoutNames[hash] = n.name;
     const byIndex = (o: Record<string, { index?: number }>) =>
@@ -181,6 +257,10 @@ export class ZenDefs {
       stats: statNames,
       socketCategories: catNames,
       gear,
+      misc,
+      collectibles: collectibleDefs,
+      vendors: vendorNames,
+      objectives: objectiveDescs,
       loadoutNames,
       loadoutColors: byIndex(loColors),
       loadoutIcons: byIndex(loIcons),

@@ -7,6 +7,71 @@ import type { InventoryService, LoadoutView } from '../zen/inventory.js';
 
 const CharacterEnum = z.enum(['hunter', 'titan', 'warlock']);
 
+/** Bungie's loadout colours and icons have no names; these follow the order in the
+ * game's (and DIM's) picker, as seen 28/09/2026. Index = position - 1. */
+const COLOR_NAMES = [
+  'black',
+  'light grey',
+  'dark grey',
+  'cyan',
+  'steel blue',
+  'light blue',
+  'blue',
+  'navy',
+  'gold',
+  'brown',
+  'green',
+  'teal',
+  'lime',
+  'orange',
+  'pink',
+  'plum',
+  'lilac',
+  'indigo',
+  'red',
+  'maroon',
+  'hot pink',
+  'wine',
+];
+const ICON_NAMES = [
+  'tree',
+  'guardian',
+  'crucible',
+  'solar',
+  'void',
+  'arc',
+  'strand',
+  'spider',
+  'stasis',
+  'swords',
+  'iron banner',
+  'sword',
+  'chevrons',
+  'serpent',
+  'eye',
+  'skull',
+  'traveler',
+  'wolves',
+  'bull',
+  'hexagon',
+  'wings',
+];
+const PickSchema = z.union([z.number().int(), z.string()]).optional();
+
+function toIndex(
+  v: number | string | undefined,
+  names: string[],
+  what: string
+): number | undefined {
+  if (v === undefined || typeof v === 'number') return v;
+  const n = Number(v);
+  if (!Number.isNaN(n)) return n;
+  const i = names.indexOf(v.toLowerCase().trim());
+  if (i < 0)
+    throw new Error(`Unknown ${what} "${v}". Options: ${names.join(', ')} (or 1-${names.length})`);
+  return i + 1;
+}
+
 function text(t: string, isError = false) {
   return { content: [{ type: 'text' as const, text: t }], ...(isError ? { isError: true } : {}) };
 }
@@ -67,10 +132,18 @@ export function registerLoadoutTools(
       if (n < 1 || n > list.length) throw new Error(`${what} must be 1 to ${list.length}`);
       return list[n - 1];
     };
+    // Empty slots report 0 for name/colour/icon, and Bungie rejects a snapshot that sends
+    // zeros (error 1622 DestinyInvalidRequest), so fall back to the first preset of each.
+    const firstName = Number(Object.keys(defs.loadoutNames)[0] ?? 0);
     return {
-      nameHash,
-      colorHash: pick(defs.loadoutColors, color, current.colorHash, 'color'),
-      iconHash: pick(defs.loadoutIcons, icon, current.iconHash, 'icon'),
+      nameHash: nameHash || firstName,
+      colorHash: pick(
+        defs.loadoutColors,
+        color,
+        current.colorHash || defs.loadoutColors[0],
+        'color'
+      ),
+      iconHash: pick(defs.loadoutIcons, icon, current.iconHash || defs.loadoutIcons[0], 'icon'),
     };
   }
 
@@ -145,13 +218,18 @@ export function registerLoadoutTools(
         .string()
         .optional()
         .describe('Preset loadout name, e.g. "Crucible"; get the list from an error if unsure'),
-      color: z.number().int().optional().describe('Colour number (1-based)'),
-      icon: z.number().int().optional().describe('Icon number (1-based)'),
+      color: PickSchema.describe(`Colour name or number (1-based): ${COLOR_NAMES.join(', ')}`),
+      icon: PickSchema.describe(`Icon name or number (1-based): ${ICON_NAMES.join(', ')}`),
     },
     async ({ character, slot, name, color, icon }) => {
       try {
         const lo = await findSlot(character, slot);
-        const ids = await resolveIdentifiers(lo, name, color, icon);
+        const ids = await resolveIdentifiers(
+          lo,
+          name,
+          toIndex(color, COLOR_NAMES, 'colour'),
+          toIndex(icon, ICON_NAMES, 'icon')
+        );
         const m = await inventory.getMembership();
         await authedPost(oauth, apiKey, '/Destiny2/Actions/Loadouts/SnapshotLoadout/', {
           loadoutIndex: lo.index,
@@ -179,15 +257,20 @@ export function registerLoadoutTools(
       character: CharacterEnum,
       slot: z.number().int().min(1).max(20),
       name: z.string().optional(),
-      color: z.number().int().optional(),
-      icon: z.number().int().optional(),
+      color: PickSchema.describe(`Colour name or number: ${COLOR_NAMES.join(', ')}`),
+      icon: PickSchema.describe(`Icon name or number: ${ICON_NAMES.join(', ')}`),
     },
     async ({ character, slot, name, color, icon }) => {
       try {
         const lo = await findSlot(character, slot);
         if (lo.empty)
           return text(`${character} slot ${slot} is empty; snapshot gear into it first.`, true);
-        const ids = await resolveIdentifiers(lo, name, color, icon);
+        const ids = await resolveIdentifiers(
+          lo,
+          name,
+          toIndex(color, COLOR_NAMES, 'colour'),
+          toIndex(icon, ICON_NAMES, 'icon')
+        );
         const m = await inventory.getMembership();
         await authedPost(oauth, apiKey, '/Destiny2/Actions/Loadouts/UpdateLoadoutIdentifiers/', {
           loadoutIndex: lo.index,
@@ -197,6 +280,33 @@ export function registerLoadoutTools(
         });
         inventory.invalidate();
         return text(`Updated ${lo.className} slot ${slot}.`);
+      } catch (err) {
+        return errorResult(err);
+      }
+    }
+  );
+
+  server.tool(
+    'clear_loadout',
+    "Clear one of the user's in-game loadout slots (removes its items and name). Reports what the slot held. Requires sign-in.",
+    {
+      character: CharacterEnum,
+      slot: z.number().int().min(1).max(20),
+    },
+    async ({ character, slot }) => {
+      try {
+        const lo = await findSlot(character, slot);
+        if (lo.empty) return text(`${character} slot ${slot} is already empty.`);
+        const m = await inventory.getMembership();
+        await authedPost(oauth, apiKey, '/Destiny2/Actions/Loadouts/ClearLoadout/', {
+          loadoutIndex: lo.index,
+          characterId: lo.characterId,
+          membershipType: m.membershipType,
+        });
+        inventory.invalidate();
+        return text(
+          `Cleared ${lo.className} slot ${slot}. It held "${lo.name || 'unnamed'}" (${lo.items.map((i) => i.name).join(', ')}).`
+        );
       } catch (err) {
         return errorResult(err);
       }
